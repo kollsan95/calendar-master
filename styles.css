@@ -1,0 +1,704 @@
+/* ===== БАЗОВЫЕ СТИЛИ ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Montserrat', 'Inter', sans-serif;
+    background: #FFFDF9;
+    color: #37474F;
+    min-height: 100vh;
+    padding: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+#app {
+    max-width: 480px;
+    width: 100%;
+    background: #FFFDF9;
+    border-radius: 24px;
+    padding: 16px 16px 20px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* ===== КНОПКИ ===== */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    font-family: 'Montserrat', sans-serif;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    min-height: 36px;
+}
+
+.btn:active {
+    transform: scale(0.97);
+}
+
+.btn-primary {
+    background: #008080;
+    color: #FFF;
+    box-shadow: 0 4px 12px rgba(0, 128, 128, 0.25);
+}
+
+.btn-primary:hover {
+    background: #006666;
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-danger {
+    background: #FFEBEE;
+    color: #C62828;
+}
+
+.btn-danger:hover {
+    background: #FFCDD2;
+}
+
+.btn-outline {
+    background: #E0F2F1;
+    color: #008080;
+}
+
+.btn-outline:hover {
+    background: #B2DFDB;
+}
+
+.btn-cancel {
+    background: #E0F2F1;
+    color: #37474F;
+}
+
+.btn-save {
+    background: #008080;
+    color: #FFF;
+    box-shadow: 0 4px 12px rgba(0, 128, 128, 0.3);
+}
+
+.btn-success {
+    background: #2e7d32;
+    color: #FFF;
+}
+
+.btn-success:hover {
+    background: #1b5e20;
+}
+
+.btn-close {
+    background: #FFEBEE;
+    color: #C62828;
+    padding: 6px 12px;
+    font-size: 16px;
+    border-radius: 10px;
+}
+
+.btn-close:hover {
+    background: #FFCDD2;
+}
+
+/* ===== ШАПКА ===== */
+#appHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+#appHeader h1 {
+    font-size: 20px;
+    color: #008080;
+}
+
+/* ===== ФИЛЬТРЫ ===== */
+#filtersContainer {
+    margin-bottom: 8px;
+}
+
+.filter-chip {
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid #E0F2F1;
+    background: #FFF;
+    color: #37474F;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.filter-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.filter-chip.active {
+    background: #008080;
+    color: #FFF;
+    border-color: #008080;
+    box-shadow: 0 4px 12px rgba(0, 128, 128, 0.25);
+}
+
+/* ===== СПИННЕР ===== */
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #E0F2F1;
+    border-top: 4px solid #008080;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.loader-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+    height: 100%;
+    min-height: 200px;
+}
+
+.loader-container p {
+    color: #7B8D8E;
+    font-size: 14px;
+}
+
+/* ===== КАЛЕНДАРЬ ===== */
+#calendarContainer {
+    margin-top: 12px;
+    height: auto;
+    max-height: 60vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+#calendarContainer .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+#calendarContainer .calendar-grid .day-cell {
+    aspect-ratio: 1;
+    width: 100%;
+    position: relative;
+}
+
+#calendarContainer .calendar-grid .day-cell canvas {
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    border-radius: 50%;
+    display: block;
+}
+
+/* ===== ДЕТАЛЬНЫЙ РЕЖИМ ===== */
+#detailContainer {
+    display: none;
+    margin-top: 12px;
+}
+
+.detail-back {
+    background: none;
+    border: none;
+    color: #008080;
+    font-size: 14px;
+    cursor: pointer;
+    font-weight: 500;
+    padding: 8px 0;
+}
+
+.detail-header {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: #008080;
+    margin: 8px 0;
+}
+
+.carousel-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 8px 0 12px;
+    position: relative;
+}
+
+.carousel-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #008080;
+    cursor: pointer;
+    padding: 0 8px;
+    z-index: 10;
+    min-width: 36px;
+}
+
+.carousel-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.carousel-track {
+    display: flex;
+    gap: 6px;
+    transition: transform 0.4s ease;
+    padding: 4px 0;
+    cursor: grab;
+}
+
+.carousel-track:active {
+    cursor: grabbing;
+}
+
+.carousel-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 auto;
+    width: 52px;
+}
+
+.carousel-item .day-tile {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.carousel-item .day-tile.active {
+    box-shadow: 0 0 0 3px #008080, 0 4px 12px rgba(0, 128, 128, 0.3);
+    transform: scale(1.05);
+}
+
+.carousel-item .day-label {
+    text-align: center;
+    font-size: 9px;
+    color: #7B8D8E;
+    margin-top: 2px;
+}
+
+.carousel-item .day-number {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: #37474F;
+    margin-top: 1px;
+}
+
+.detail-tile-container {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+}
+
+.detail-tile-container canvas {
+    width: 100%;
+    cursor: pointer;
+}
+
+.detail-records-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #37474F;
+    margin: 8px 0 4px;
+}
+
+.detail-records-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.detail-records-list li {
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    background: #E0F2F1;
+    border-radius: 8px;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.detail-records-list .delete-btn {
+    background: none;
+    border: none;
+    color: #C62828;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+/* ===== МОДАЛКИ ===== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 20px;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    background: #FFFDF9;
+    border-radius: 24px;
+    padding: 28px;
+    max-width: 420px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s ease;
+}
+
+.modal-content h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #008080;
+    margin-bottom: 8px;
+}
+
+.modal-content .sub {
+    font-size: 14px;
+    color: #7B8D8E;
+    margin-bottom: 20px;
+}
+
+.modal-content .form-group {
+    margin-bottom: 16px;
+}
+
+.modal-content .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #37474F;
+    margin-bottom: 4px;
+}
+
+.modal-content .form-control {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid #E0F2F1;
+    border-radius: 12px;
+    font-size: 15px;
+    font-family: 'Montserrat', sans-serif;
+    background: #FFF;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.modal-content .form-control:focus {
+    border-color: #008080;
+    box-shadow: 0 0 0 4px rgba(0, 128, 128, 0.08);
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.modal-buttons .btn {
+    flex: 1;
+}
+
+/* ===== ВКЛАДКИ МОДАЛКИ ===== */
+.modal-tab {
+    transition: all 0.3s ease;
+}
+
+.modal-tab:hover {
+    background: rgba(0, 128, 128, 0.05);
+}
+
+.modal-tab.active {
+    color: #008080;
+    border-bottom-color: #008080;
+}
+
+.modal-tab:not(.active) {
+    color: #7B8D8E;
+    border-bottom-color: transparent;
+}
+
+/* ===== НИЖНЯЯ ПАНЕЛЬ ===== */
+.bottom-panel {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.bottom-panel .btn {
+    flex: 1;
+}
+
+/* ===== СТРАНИЦА ОКОШЕК (внутренняя) ===== */
+#windowsPage {
+    background: #FFFDF9;
+}
+
+#windowsPage .mode-badge {
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: #E0F2F1;
+    color: #008080;
+    font-weight: 500;
+}
+
+#windowsPage .mode-badge.view {
+    background: #E0F2F1;
+    color: #008080;
+}
+
+#windowsPage .btn {
+    min-height: 34px;
+    font-size: 13px;
+    padding: 6px 14px;
+}
+
+#windowsPage .btn-primary {
+    background: #008080;
+    color: #FFF;
+}
+
+#windowsPage .btn-success {
+    background: #2e7d32;
+    color: #FFF;
+}
+
+#windowsPage .btn-danger {
+    background: #c62828;
+    color: #FFF;
+}
+
+#windowsPage .btn-outline {
+    background: #E0F2F1;
+    color: #008080;
+}
+
+#windowsPage .btn-close {
+    background: #FFEBEE;
+    color: #C62828;
+    border: none;
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+#windowsPageContainer {
+    background: #FFF;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+#windowsPageCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+}
+
+#windowsPagePreview {
+    display: none;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: default;
+}
+
+#windowsPageHint {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: #FFF;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+    white-space: nowrap;
+}
+
+#windowsPageHint.show {
+    opacity: 1;
+}
+
+#windowsPageSpinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 32px;
+    height: 32px;
+    border: 3px solid #E0F2F1;
+    border-top: 3px solid #008080;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: none;
+}
+
+#windowsPageFooter {
+    margin-top: 12px;
+    padding: 8px 0;
+    text-align: center;
+    color: #7B8D8E;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+/* ===== ФАЙЛОВЫЙ ИНПУТ ===== */
+.file-upload-wrapper {
+    position: relative;
+    display: inline-block;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.file-upload-wrapper .btn {
+    pointer-events: none;
+}
+
+.file-upload-wrapper input[type="file"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* ===== АНИМАЦИИ ===== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ===== КНОПКА УСТАНОВКИ ===== */
+#installBtn {
+    transition: all 0.3s ease;
+}
+
+#installBtn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 128, 128, 0.4);
+}
+
+#installBtn:active {
+    transform: scale(0.98);
+}
+
+/* ===== АДАПТИВНОСТЬ ===== */
+@media (max-width: 480px) {
+    #app {
+        padding: 12px;
+    }
+
+    #appHeader h1 {
+        font-size: 18px;
+    }
+
+    .filter-chip {
+        font-size: 12px;
+        padding: 4px 12px;
+    }
+
+    #calendarContainer .calendar-grid {
+        gap: 3px;
+    }
+
+    .detail-tile-container canvas {
+        width: 280px;
+        height: 280px;
+    }
+
+    .modal-content {
+        padding: 20px;
+        border-radius: 20px;
+    }
+
+    .btn {
+        font-size: 13px;
+        padding: 6px 12px;
+        min-height: 32px;
+    }
+
+    #windowsPage .btn {
+        font-size: 12px;
+        padding: 4px 10px;
+        min-height: 30px;
+    }
+
+    #windowsPageHint {
+        font-size: 10px;
+        padding: 6px 12px;
+        white-space: normal;
+    }
+}

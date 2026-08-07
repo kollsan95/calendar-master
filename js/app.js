@@ -76,12 +76,10 @@ let firebaseInitialized = false;
 function checkAuth() {
     const isAuth = isUserAuthenticated();
     const user = getCurrentUser();
-    
     if (!isAuth || !user) {
         window.location.href = '/login.html';
         return false;
     }
-    
     return true;
 }
 
@@ -94,22 +92,18 @@ async function loadMastersList() {
         const usersRef = firebase.database().ref('users');
         const snapshot = await usersRef.once('value');
         const users = snapshot.val() || {};
-        
         const masters = [];
         for (const key in users) {
             if (users[key].role === 'master' || users[key].role === 'admin') {
                 masters.push(users[key].name);
             }
         }
-        
         const currentUser = getCurrentUser();
         if (masters.length === 0 && currentUser && currentUser.name) {
             masters.push(currentUser.name);
         }
-        
         const select = document.getElementById('modalMasterName');
         if (select) {
-            const currentValue = select.value;
             select.innerHTML = '';
             masters.forEach(name => {
                 const option = document.createElement('option');
@@ -117,19 +111,12 @@ async function loadMastersList() {
                 option.textContent = name;
                 select.appendChild(option);
             });
-            
-            if (currentUser && currentUser.name) {
-                if (masters.includes(currentUser.name)) {
-                    select.value = currentUser.name;
-                } else if (masters.length > 0) {
-                    select.value = masters[0];
-                }
+            if (currentUser && currentUser.name && masters.includes(currentUser.name)) {
+                select.value = currentUser.name;
             } else if (masters.length > 0) {
                 select.value = masters[0];
             }
         }
-        
-        console.log('📋 Загружено мастеров:', masters.length);
         return masters;
     } catch (error) {
         console.error('❌ Ошибка загрузки мастеров:', error);
@@ -228,25 +215,20 @@ function getCleanupDays() {
 
 async function initFirebase() {
     const loader = document.getElementById('loader');
-    if (loader) {
-        loader.style.display = 'none';
-    }
+    if (loader) loader.style.display = 'none';
     
     try {
         if (typeof firebase === 'undefined') {
             console.error('❌ Firebase SDK не загружен');
             return false;
         }
-        
         if (typeof FirebaseSync === 'undefined') {
             console.error('❌ FirebaseSync не загружен');
             return false;
         }
-        
         firebaseSync = new FirebaseSync();
         const data = await firebaseSync.loadAllRecords();
         console.log('📊 Данные загружены:', Object.keys(data).length, 'дней');
-        
         firebaseInitialized = true;
         console.log('✅ Firebase инициализирован');
         return true;
@@ -263,7 +245,6 @@ async function initFirebase() {
 
 document.addEventListener('DOMContentLoaded', function() {
     if (!checkAuth()) return;
-    
     console.log('🚀 Приложение загружено');
     updateFilterColors();
     loadNotifications();
@@ -288,14 +269,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadRecords() {
     const loader = document.getElementById('loader');
-    if (loader) {
-        loader.style.display = 'none';
-    }
+    if (loader) loader.style.display = 'none';
     
     if (!firebaseInitialized) {
         const initialized = await initFirebase();
         if (!initialized) {
-            console.log('⏳ Повторная попытка через 2 секунды...');
             setTimeout(loadRecords, 2000);
             return;
         }
@@ -305,21 +283,15 @@ async function loadRecords() {
         if (firebaseSync) {
             firebaseSync.syncRecords((data) => {
                 recordsData = data;
-                
-                const container = document.getElementById('calendarContainer');
-                if (container) {
-                    container.innerHTML = '';
-                    renderCalendarContent(container);
-                }
-                
+                renderCalendar();
                 if (document.getElementById('detailContainer').style.display === 'block') {
                     const d = Detail.currentDay, 
                         m = Detail.currentMonth || currentMonth, 
                         y = Detail.currentYear || currentYear;
                     Detail.drawDetailTile(d, m, y, []);
                     Detail.updateRecordsList(d, m, y);
+                    Detail.populateCarousel(d, m, y);
                 }
-                
                 updateBadge();
                 console.log('🔄 Данные синхронизированы');
             });
@@ -356,14 +328,11 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
     try {
         const id = await firebaseSync.addRecord(record);
         record.id = id;
-        
         scheduleReminder(record);
         addNotification('📝 Добавлена запись: ' + serviceType + ' на ' + date + ' ' + startHour + ':00');
         sendSystemNotification('Новая запись', serviceType + ' на ' + date + ' ' + startHour + ':00');
-        
         closeModal();
         showToast('✅ Запись сохранена!');
-        
         if (openLetter && serviceType !== 'Выходной') {
             setTimeout(() => openModalWithLetter(record), 300);
         }
@@ -378,17 +347,14 @@ async function deleteRecordFromDB(id, dateKey, serviceType) {
     
     try {
         await firebaseSync.deleteRecord(id, dateKey);
-        
         if (recordsData[dateKey]) {
             recordsData[dateKey] = recordsData[dateKey].filter(r => String(r.id) !== String(id));
             if (recordsData[dateKey].length === 0) {
                 delete recordsData[dateKey];
             }
         }
-        
         addNotification('🗑️ Удалена запись: ' + serviceType);
         sendSystemNotification('Запись удалена', serviceType + ' удалена');
-        
         renderCalendar();
         refreshDetail();
         closeModal();
@@ -484,118 +450,79 @@ function showNotificationsList() {
 }
 
 // ============================================
-//  КАЛЕНДАРЬ (С АНИМАЦИЕЙ)
+//  КАЛЕНДАРЬ
 // ============================================
 
 function renderCalendar(direction) {
     const container = document.getElementById('calendarContainer');
     if (!container) return;
-    
     const loader = document.getElementById('loader');
-    if (loader) {
-        loader.style.display = 'none';
-    }
+    if (loader) loader.style.display = 'none';
     
     container.innerHTML = '';
     
     if (direction && !isAnimating) {
         isAnimating = true;
-        
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'position:relative;overflow:hidden;height:auto;';
         container.appendChild(wrapper);
-        
         const oldContent = document.createElement('div');
-        oldContent.innerHTML = renderCalendarContentHTML();
+        oldContent.innerHTML = buildCalendarHTML();
         wrapper.appendChild(oldContent);
-        
         const newContent = document.createElement('div');
         newContent.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
         newContent.style.transform = direction === 'next' ? 'translateX(100%)' : 'translateX(-100%)';
         newContent.style.transition = 'none';
         container.appendChild(newContent);
-        
-        newContent.innerHTML = renderCalendarContentHTML();
-        
+        newContent.innerHTML = buildCalendarHTML();
         requestAnimationFrame(() => {
             oldContent.style.transition = 'transform 0.3s ease';
             oldContent.style.transform = direction === 'next' ? 'translateX(-100%)' : 'translateX(100%)';
-            
             newContent.style.transition = 'transform 0.3s ease';
             newContent.style.transform = 'translateX(0)';
         });
-        
         setTimeout(() => {
             container.innerHTML = '';
-            container.innerHTML = renderCalendarContentHTML();
+            container.innerHTML = buildCalendarHTML();
+            renderCalendarDays(container);
             isAnimating = false;
         }, 350);
-        
         return;
     }
     
-    container.innerHTML = renderCalendarContentHTML();
+    container.innerHTML = buildCalendarHTML();
+    renderCalendarDays(container);
 }
 
-function renderCalendarContentHTML() {
-    let html = '';
-    
-    html += `
+function buildCalendarHTML() {
+    let html = `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0 10px;border-bottom:1px solid #E0F2F1;">
             <button id="prevMonth" style="background:none;border:none;font-size:24px;color:#008080;cursor:pointer;padding:0 12px;">‹</button>
             <span style="font-size:18px;font-weight:600;color:#008080;">${new Date(currentYear, currentMonth - 1).toLocaleString('ru', { month: 'long', year: 'numeric' })}</span>
             <button id="nextMonth" style="background:none;border:none;font-size:24px;color:#008080;cursor:pointer;padding:0 12px;">›</button>
         </div>
+        <div class="calendar-grid">
     `;
-    
-    html += `<div class="calendar-grid">`;
-    
     ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].forEach(day => {
         html += `<div style="text-align:center;font-size:10px;font-weight:600;color:#7B8D8E;padding:2px 0 4px;text-transform:uppercase;">${day}</div>`;
     });
-    
     const firstDay = new Date(currentYear, currentMonth - 1, 1);
     const lastDay = new Date(currentYear, currentMonth, 0);
     for (let i = 1; i < (firstDay.getDay() || 7); i++) {
         html += `<div style="aspect-ratio:1;"></div>`;
     }
-    
     for (let d = 1; d <= lastDay.getDate(); d++) {
         const isPast = isDayPast(currentYear, currentMonth, d);
-        const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-        let dayRecords = recordsData[dateKey] || [];
-        if (!Array.isArray(dayRecords)) {
-            dayRecords = Object.values(dayRecords);
-        }
-        
-        const user = getCurrentUser();
-        const userId = user ? user.id : null;
-        
-        let hasBookings = false;
-        for (const r of dayRecords) {
-            if (r.startHour !== undefined && r.endHour !== undefined) {
-                hasBookings = true;
-                break;
-            }
-        }
-        
         html += `<div class="day-cell" style="position:relative;aspect-ratio:1;width:100%;">
-            <canvas id="day_${d}" width="120" height="120" style="width:100%;height:100%;cursor:pointer;border-radius:50%;display:block;"></canvas>`;
-        
-        if (isPast) {
-            html += `<div style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;background:rgba(200,200,200,0.3);pointer-events:none;"></div>`;
-        }
-        html += `</div>`;
+            <canvas id="day_${d}" width="120" height="120" style="width:100%;height:100%;cursor:pointer;border-radius:50%;display:block;"></canvas>
+            ${isPast ? `<div style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;background:rgba(200,200,200,0.3);pointer-events:none;"></div>` : ''}
+        </div>`;
     }
-    
     html += `</div>`;
     return html;
 }
 
-function renderCalendarContent(container) {
-    container.innerHTML = renderCalendarContentHTML();
-    
-    // Рисуем каждый день
+function renderCalendarDays(container) {
     const canvases = container.querySelectorAll('canvas[id^="day_"]');
     canvases.forEach(canvas => {
         const day = parseInt(canvas.id.split('_')[1]);
@@ -632,7 +559,6 @@ function drawTile(canvas, day, isPast) {
     if (!Array.isArray(dayRecords)) {
         dayRecords = Object.values(dayRecords);
     }
-    
     if (Array.isArray(dayRecords) && dayRecords.length > 0) {
         const seen = new Set();
         dayRecords = dayRecords.filter(record => {
@@ -646,7 +572,6 @@ function drawTile(canvas, day, isPast) {
     
     const user = getCurrentUser();
     const userId = user ? user.id : null;
-    
     const hourWidth = (Math.PI*2) / WORKING_HOURS;
     const startAngle = Math.PI;
     
@@ -654,7 +579,6 @@ function drawTile(canvas, day, isPast) {
         const hour = 9 + i;
         const angleStart = startAngle + i * hourWidth;
         const angleEnd = angleStart + hourWidth;
-        
         let isBooked = false, color = GRAY, serviceType = '', isOwn = false;
         for (const r of dayRecords) {
             if (hour >= r.startHour && hour < r.endHour) {
@@ -678,7 +602,6 @@ function drawTile(canvas, day, isPast) {
             const alpha = isPast ? '20' : '40';
             const fillColor = isOwn ? color + alpha : GRAY + '40';
             const strokeColor = isOwn ? (isPast ? color + '60' : color) : GRAY;
-            
             ctx.fillStyle = shouldBeGray ? GRAY + '40' : fillColor;
             ctx.fill();
             ctx.strokeStyle = shouldBeGray ? GRAY : strokeColor;
@@ -786,7 +709,6 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         const isDayOffField = serviceType === 'Выходной';
         const nameGroup = document.getElementById('modalClientName').closest('.form-group');
         const phoneGroup = document.getElementById('modalClientPhone').closest('.form-group');
-        
         if (isDayOffField || readOnly) {
             document.getElementById('modalClientName').value = '';
             document.getElementById('modalClientPhone').value = '';
@@ -801,7 +723,6 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     if (recordId) {
         const dayRecords = recordsData[dateKey] || [];
         const record = dayRecords.find(r => String(r.id) === String(recordId));
-        
         if (record) {
             document.getElementById('modalService').value = record.serviceType;
             document.getElementById('modalStartHour').value = record.startHour;
@@ -822,27 +743,13 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
             }
             toggleClientFields(record.serviceType);
             
-            if (readOnly) {
-                document.getElementById('modalService').disabled = true;
-                document.getElementById('modalStartHour').disabled = true;
-                document.getElementById('modalEndHour').disabled = true;
-                document.getElementById('modalClientName').disabled = true;
-                document.getElementById('modalClientPhone').disabled = true;
-                document.getElementById('modalNote').disabled = true;
-                document.getElementById('modalMasterName').disabled = true;
-                document.getElementById('modalSave').style.display = 'none';
-                document.getElementById('modalDeleteTopBtn').style.display = 'none';
-            } else {
-                document.getElementById('modalService').disabled = false;
-                document.getElementById('modalStartHour').disabled = false;
-                document.getElementById('modalEndHour').disabled = false;
-                document.getElementById('modalClientName').disabled = false;
-                document.getElementById('modalClientPhone').disabled = false;
-                document.getElementById('modalNote').disabled = false;
-                document.getElementById('modalMasterName').disabled = false;
-                document.getElementById('modalSave').style.display = 'block';
-                document.getElementById('modalDeleteTopBtn').style.display = 'block';
-            }
+            // Блокируем поля если readOnly
+            ['modalService', 'modalStartHour', 'modalEndHour', 'modalClientName', 'modalClientPhone', 'modalNote', 'modalMasterName'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.disabled = readOnly;
+            });
+            document.getElementById('modalSave').style.display = readOnly ? 'none' : 'block';
+            document.getElementById('modalDeleteTopBtn').style.display = readOnly ? 'none' : 'block';
         } else {
             editingRecordId = null;
             document.getElementById('modalService').value = 'Кератин';
@@ -913,7 +820,6 @@ function renderLetterTemplates(record) {
     });
     
     container.innerHTML = html;
-    
     container.querySelectorAll('.copy-letter-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -988,60 +894,35 @@ function saveRecordFromModal() {
 
 function initModal() {
     const closeBtn = document.getElementById('modalCloseBtn');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            closeModal();
-        });
-    }
+    if (closeBtn) closeBtn.addEventListener('click', function(e) { e.preventDefault(); closeModal(); });
     
     const overlay = document.getElementById('modalOverlay');
-    if (overlay) {
-        overlay.addEventListener('click', function(e) {
-            if (e.target === e.currentTarget) {
-                closeModal();
-            }
-        });
-    }
+    if (overlay) overlay.addEventListener('click', function(e) { if (e.target === e.currentTarget) closeModal(); });
     
     const saveBtn = document.getElementById('modalSave');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            saveRecordFromModal();
-        });
-    }
+    if (saveBtn) saveBtn.addEventListener('click', function(e) { e.preventDefault(); saveRecordFromModal(); });
     
     const deleteTopBtn = document.getElementById('modalDeleteTopBtn');
     if (deleteTopBtn) {
         const newDeleteBtn = deleteTopBtn.cloneNode(true);
         deleteTopBtn.parentNode.replaceChild(newDeleteBtn, deleteTopBtn);
-        
         newDeleteBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            
             const overlay2 = document.getElementById('modalOverlay');
             const id = overlay2.dataset.deleteId;
             const dateKey = overlay2.dataset.deleteDate;
             const serviceType = overlay2.dataset.deleteService;
-            
             if (!id || !dateKey) {
                 showToast('❌ Ошибка: не найдена запись для удаления', 'error');
                 return;
             }
-            
             deleteRecordFromDB(String(id), dateKey, serviceType);
         });
     }
     
     const mainTab = document.getElementById('modalTabMain');
-    if (mainTab) {
-        mainTab.addEventListener('click', function(e) {
-            e.preventDefault();
-            switchTab('main');
-        });
-    }
+    if (mainTab) mainTab.addEventListener('click', function(e) { e.preventDefault(); switchTab('main'); });
     
     const letterTab = document.getElementById('modalTabLetter');
     if (letterTab) {
@@ -1049,23 +930,19 @@ function initModal() {
             e.preventDefault();
             if (this.style.pointerEvents === 'none') return;
             switchTab('letter');
-            
             const overlay2 = document.getElementById('modalOverlay');
             if (overlay2 && overlay2.dataset.date) {
                 const dateKey = overlay2.dataset.date;
                 const recordId = editingRecordId;
                 const dayRecords = recordsData[dateKey] || [];
                 const record = dayRecords.find(r => String(r.id) === String(recordId));
-                if (record) {
-                    renderLetterTemplates(record);
-                }
+                if (record) renderLetterTemplates(record);
             }
         });
     }
     
     const startSelect = document.getElementById('modalStartHour');
     const endSelect = document.getElementById('modalEndHour');
-    
     if (startSelect) {
         startSelect.innerHTML = '';
         for (let i = 9; i <= 20; i++) {
@@ -1075,7 +952,6 @@ function initModal() {
             startSelect.appendChild(option);
         }
     }
-    
     if (endSelect) {
         endSelect.innerHTML = '';
         for (let i = 10; i <= 21; i++) {
@@ -1092,7 +968,6 @@ function initModal() {
             const isDayOff = this.value === 'Выходной';
             const nameGroup = document.getElementById('modalClientName').closest('.form-group');
             const phoneGroup = document.getElementById('modalClientPhone').closest('.form-group');
-            
             if (isDayOff) {
                 document.getElementById('modalClientName').value = '';
                 document.getElementById('modalClientPhone').value = '';
@@ -1111,12 +986,10 @@ function deleteRecordFromModal() {
     const id = overlay.dataset.deleteId;
     const dateKey = overlay.dataset.deleteDate;
     const serviceType = overlay.dataset.deleteService;
-    
     if (!id || !dateKey) {
         showToast('❌ Ошибка: не найдена запись для удаления', 'error');
         return;
     }
-    
     deleteRecordFromDB(String(id), dateKey, serviceType);
 }
 
@@ -1154,7 +1027,6 @@ function openSettings() {
 function renderLogoutButton() {
     const container = document.getElementById('settingsLogoutContainer');
     if (!container) return;
-    
     const user = getCurrentUser();
     container.innerHTML = `
         <div style="padding:12px 0;border-top:1px solid #E0F2F1;margin-top:8px;">
@@ -1167,7 +1039,6 @@ function renderLogoutButton() {
             </div>
         </div>
     `;
-    
     const logoutBtn = document.getElementById('settingsLogoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', function() {
@@ -1193,7 +1064,6 @@ function renderSettingsColors() {
     }
     html += '<button class="btn btn-save" id="settingsColorsSave" style="width:100%;margin-top:8px;padding:8px;">Сохранить цвета</button>';
     container.innerHTML = html;
-    
     const saveBtn = document.getElementById('settingsColorsSave');
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
@@ -1219,7 +1089,6 @@ function renderCleanupSettings() {
         </div>
         <div style="font-size:11px;color:#7B8D8E;margin-top:4px;">Будут удалены записи, шаблоны окошек и уведомления старше указанного количества дней</div>
     `;
-    
     const daysInput = document.getElementById('settingsCleanupDays');
     if (daysInput) {
         daysInput.addEventListener('change', function() {
@@ -1233,7 +1102,6 @@ function renderCleanupSettings() {
             }
         });
     }
-    
     const nowBtn = document.getElementById('settingsCleanupNow');
     if (nowBtn) {
         nowBtn.addEventListener('click', function() {
@@ -1251,7 +1119,6 @@ function performCleanup() {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffTime = cutoff.getTime();
-    
     getAllRecords().then(records => {
         const toDelete = records.filter(r => new Date(r.date).getTime() < cutoffTime);
         toDelete.forEach(r => deleteRecord(r.id));
@@ -1259,7 +1126,6 @@ function performCleanup() {
             recordsData[key] = recs.filter(r => new Date(r.date).getTime() >= cutoffTime);
             if (recordsData[key].length === 0) delete recordsData[key];
         }
-        
         const monthKey = getMonthKey();
         for (const key of Object.keys(localStorage)) {
             if (key.startsWith(STORAGE_KEYS.TEMPLATE_PREFIX) && key !== STORAGE_KEYS.TEMPLATE_PREFIX + monthKey) {
@@ -1270,7 +1136,6 @@ function performCleanup() {
                 }
             }
         }
-        
         renderCalendar();
         updateBadge();
         showToast('✅ Очистка завершена');
@@ -1346,12 +1211,10 @@ function renderStats() {
     const from = document.getElementById('statsDateFrom').value;
     const to = document.getElementById('statsDateTo').value;
     if (!from || !to) { container.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">Выберите период</p>'; return; }
-    
     const fromDate = new Date(from), toDate = new Date(to);
     toDate.setHours(23,59,59,999);
     const stats = {'Кератин':0,'Ботокс':0,'Холодное':0,'Полировка':0};
     let total = 0;
-    
     for (const [dateKey, records] of Object.entries(recordsData)) {
         const d = new Date(dateKey);
         if (d >= fromDate && d <= toDate) {
@@ -1363,9 +1226,7 @@ function renderStats() {
             });
         }
     }
-    
     if (total === 0) { container.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">Нет данных</p>'; return; }
-    
     const maxCount = Math.max(...Object.values(stats));
     let html = '<div style="margin-bottom:12px;text-align:center;font-size:14px;color:#37474F;">Всего записей: <strong>' + total + '</strong></div>';
     for (const [service, count] of Object.entries(stats)) {
@@ -1403,7 +1264,6 @@ const Detail = {
         document.getElementById('detailContainer').style.display = 'block';
         document.getElementById('appHeader').style.display = 'none';
         this.updateHeader(month, year);
-        
         if (!this.isInitialized || this.lastMonth !== month || this.lastYear !== year) {
             this.populateCarousel(day, month, year);
             this.lastMonth = month;
@@ -1478,7 +1338,6 @@ const Detail = {
         ];
         track.innerHTML = '';
         const daysOfWeek = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
-        
         const user = getCurrentUser();
         const userId = user ? user.id : null;
         
@@ -1489,7 +1348,6 @@ const Detail = {
                 wrapper.dataset.day = d;
                 wrapper.dataset.month = m;
                 wrapper.dataset.year = y;
-                
                 const tile = document.createElement('div');
                 tile.className = 'day-tile';
                 const isPast = isDayPast(y, m, d);
@@ -1503,7 +1361,6 @@ const Detail = {
                 const size = canvas.width, cx = size/2, cy = size/2;
                 const radius = size/2 - 6, innerRadius = radius * INNER_RADIUS_RATIO;
                 ctx.clearRect(0, 0, size, size);
-                
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI*2);
                 ctx.fillStyle = isPast ? '#F5F5F5' : '#FFFDF9';
@@ -1511,7 +1368,6 @@ const Detail = {
                 ctx.strokeStyle = '#E0F2F1';
                 ctx.lineWidth = 1;
                 ctx.stroke();
-                
                 ctx.beginPath();
                 ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
                 ctx.fillStyle = '#FFFDF9';
@@ -1528,7 +1384,6 @@ const Detail = {
                 
                 const hourWidth = (Math.PI*2) / WORKING_HOURS;
                 const startAngle = Math.PI;
-                
                 for (let i = 0; i < WORKING_HOURS; i++) {
                     const hour = 9 + i;
                     const angleStart = startAngle + i * hourWidth;
@@ -1563,7 +1418,6 @@ const Detail = {
                         ctx.stroke();
                     }
                 }
-                
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = isPast ? '#A0A0A0' : '#37474F';
@@ -1595,7 +1449,6 @@ const Detail = {
         const radius = size/2 - 20;
         const innerRadius = radius * INNER_RADIUS_RATIO;
         ctx.clearRect(0, 0, size, size);
-        
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI*2);
         ctx.fillStyle = '#FFFDF9';
@@ -1603,7 +1456,6 @@ const Detail = {
         ctx.strokeStyle = '#E0F2F1';
         ctx.lineWidth = 2;
         ctx.stroke();
-        
         ctx.beginPath();
         ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
         ctx.fillStyle = '#FFFDF9';
@@ -1617,10 +1469,8 @@ const Detail = {
         if (!Array.isArray(dayRecords)) {
             dayRecords = Object.values(dayRecords);
         }
-        
         const user = getCurrentUser();
         const userId = user ? user.id : null;
-        
         const hourWidth = (Math.PI*2) / WORKING_HOURS;
         const startAngle = Math.PI;
         const isPast = isDayPast(year, month, day);
@@ -1645,11 +1495,9 @@ const Detail = {
             ctx.arc(cx, cy, radius, angleStart, angleEnd);
             ctx.arc(cx, cy, innerRadius, angleEnd, angleStart);
             ctx.closePath();
-            
             if (isBooked) {
                 const fillColor = isOwn ? color + '40' : GRAY + '40';
                 const strokeColor = isOwn ? (isPast ? color + '60' : color) : GRAY;
-                
                 ctx.fillStyle = isPast ? color + '20' : fillColor;
                 ctx.fill();
                 ctx.strokeStyle = isHighlighted ? '#008080' : (isPast ? strokeColor : strokeColor);
@@ -1669,7 +1517,6 @@ const Detail = {
                 ctx.stroke();
             }
         }
-        
         const labelRadius = radius + 28;
         for (let i = 0; i < WORKING_HOURS; i++) {
             const hour = 9 + i;
@@ -1692,10 +1539,8 @@ const Detail = {
         if (!Array.isArray(dayRecords)) {
             dayRecords = Object.values(dayRecords);
         }
-        
         const user = getCurrentUser();
         const userId = user ? user.id : null;
-        
         const list = document.getElementById('detailRecordsList');
         list.innerHTML = '';
         if (dayRecords.length === 0) {
@@ -1708,23 +1553,19 @@ const Detail = {
             const color = isOwn ? (COLORS[record.serviceType] || '#008080') : GRAY;
             const borderColor = isOwn ? color : GRAY;
             const bgColor = isOwn ? color + '30' : GRAY + '20';
-            
             const li = document.createElement('li');
             li.style.cssText = `padding:8px 12px;margin-bottom:4px;background:${bgColor};border-radius:8px;cursor:pointer;transition:background 0.2s;border-left:4px solid ${borderColor};`;
             const start = String(record.startHour).padStart(2,'0') + ':00';
             const end = String(record.endHour).padStart(2,'0') + ':00';
             let info = '<strong>' + start + ' — ' + end + '</strong>';
             info += ' <span style="color:' + (isOwn ? '#008080' : '#7B8D8E') + ';font-weight:500;margin-left:6px;">' + record.serviceType + '</span>';
-            
             if (isOwn && record.serviceType !== 'Выходной') {
                 if (record.clientName) info += ' <span style="margin-left:8px;font-size:12px;color:#37474F;">' + record.clientName + '</span>';
                 if (record.clientPhone) info += ' <span style="margin-left:8px;font-size:12px;color:#7B8D8E;">' + record.clientPhone + '</span>';
             }
-            
             if (record.master) {
                 info += ' <span style="margin-left:8px;font-size:11px;color:#7B8D8E;">👤 ' + record.master + '</span>';
             }
-            
             if (isOwn && record.note) info += '<br><span style="font-size:11px;color:#7B8D8E;margin-left:6px;">📝 ' + record.note + '</span>';
             li.innerHTML = info;
             li.addEventListener('click', () => {
@@ -1734,12 +1575,8 @@ const Detail = {
                     openModal(day, month, year, null, record.id, true);
                 }
             });
-            li.addEventListener('mouseenter', function() { 
-                this.style.background = isOwn ? color + '50' : GRAY + '30'; 
-            });
-            li.addEventListener('mouseleave', function() { 
-                this.style.background = isOwn ? color + '30' : GRAY + '20'; 
-            });
+            li.addEventListener('mouseenter', function() { this.style.background = isOwn ? color + '50' : GRAY + '30'; });
+            li.addEventListener('mouseleave', function() { this.style.background = isOwn ? color + '30' : GRAY + '20'; });
             list.appendChild(li);
         });
     }
@@ -1755,12 +1592,10 @@ function initNavigation() {
     const container = document.getElementById('calendarContainer');
     let touchStartX = 0;
     let touchEndX = 0;
-    
     if (container) {
         container.addEventListener('touchstart', function(e) {
             touchStartX = e.changedTouches[0].screenX;
         }, { passive: true });
-        
         container.addEventListener('touchend', function(e) {
             touchEndX = e.changedTouches[0].screenX;
             const diff = touchStartX - touchEndX;
@@ -1777,7 +1612,6 @@ function initNavigation() {
             }
         }, { passive: true });
     }
-    
     document.addEventListener('click', e => {
         if (e.target.id === 'prevMonth') {
             if (currentMonth === 1) { currentMonth = 12; currentYear--; }
@@ -1801,7 +1635,6 @@ function initDetailControls() {
         document.getElementById('appHeader').style.display = 'flex';
         renderCalendar();
     });
-    
     document.getElementById('detailAddBtn').addEventListener('click', () => {
         if (Detail.currentDay) openModal(Detail.currentDay, currentMonth, currentYear);
     });
@@ -1814,7 +1647,6 @@ function initDetailControls() {
 function initCarousel() {
     const track = document.getElementById('carouselTrack');
     if (!track) return;
-    
     track.addEventListener('mousedown', e => { isDragging = true; startX = e.clientX; startScrollPos = carouselScrollPos; track.style.transition = 'none'; });
     document.addEventListener('mousemove', e => {
         if (!isDragging) return;
@@ -1830,7 +1662,6 @@ function initCarousel() {
         track.style.transform = 'translateX(' + carouselScrollPos + 'px)';
         setTimeout(() => Detail.updateHeaderFromCarousel(), 100);
     });
-    
     track.addEventListener('touchstart', e => { isDragging = true; startX = e.touches[0].clientX; startScrollPos = carouselScrollPos; track.style.transition = 'none'; }, { passive: true });
     track.addEventListener('touchmove', e => {
         if (!isDragging) return;
@@ -1846,7 +1677,6 @@ function initCarousel() {
         track.style.transform = 'translateX(' + carouselScrollPos + 'px)';
         setTimeout(() => Detail.updateHeaderFromCarousel(), 100);
     }, { passive: true });
-    
     track.addEventListener('wheel', e => {
         e.preventDefault();
         carouselScrollPos += (e.deltaY > 0 ? -1 : 1) * 58;
@@ -1864,14 +1694,12 @@ function initDetailCanvas() {
     if (!canvas) return;
     let rangeStart = null, rangeHours = [], isRangeDragging = false;
     let singleClickTimeout = null;
-    let currentUserId = null;
     
     function getHourFromEvent(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX);
         const clientY = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY);
         if (clientX === undefined || clientY === undefined) return null;
-        
         const x = (clientX - rect.left) / rect.width * canvas.width;
         const y = (clientY - rect.top) / rect.height * canvas.height;
         const cx = canvas.width/2, cy = canvas.height/2;
@@ -1899,6 +1727,19 @@ function initDetailCanvas() {
         return bookedHours;
     }
     
+    function getRecordAtHour(dateKey, hour) {
+        const dayRecords = recordsData[dateKey] || [];
+        if (!Array.isArray(dayRecords)) {
+            return null;
+        }
+        for (const r of dayRecords) {
+            if (hour >= r.startHour && hour < r.endHour) {
+                return r;
+            }
+        }
+        return null;
+    }
+    
     function handleStart(e) {
         e.preventDefault();
         const hour = getHourFromEvent(e);
@@ -1906,37 +1747,22 @@ function initDetailCanvas() {
         
         const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(Detail.currentDay || 1);
         const user = getCurrentUser();
-        currentUserId = user ? user.id : null;
-        
-        let dayRecords = recordsData[dateKey] || [];
-        if (!Array.isArray(dayRecords)) {
-            dayRecords = Object.values(dayRecords);
-        }
+        const userId = user ? user.id : null;
         
         // Проверяем, есть ли запись на этом часе
-        let clickedRecord = null;
-        for (const r of dayRecords) {
-            if (hour >= r.startHour && hour < r.endHour) {
-                clickedRecord = r;
-                break;
-            }
-        }
-        
-        // Если нажали на существующую запись
-        if (clickedRecord) {
-            const isOwn = clickedRecord.userId === currentUserId;
+        const existingRecord = getRecordAtHour(dateKey, hour);
+        if (existingRecord) {
+            const isOwn = existingRecord.userId === userId;
             if (isOwn) {
-                openModal(Detail.currentDay, currentMonth, currentYear, null, clickedRecord.id);
+                openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id);
             } else {
-                openModal(Detail.currentDay, currentMonth, currentYear, null, clickedRecord.id, true);
+                openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id, true);
             }
             return;
         }
         
-        // Если слот свободен - начинаем выделение
-        const bookedHours = getBookedHours(dateKey);
-        
         // Проверяем, не занят ли этот час
+        const bookedHours = getBookedHours(dateKey);
         if (bookedHours.has(hour)) {
             showToast('⏰ Это время уже занято', 'error');
             return;
@@ -1974,41 +1800,41 @@ function initDetailCanvas() {
         const bookedHours = getBookedHours(dateKey);
         
         // Находим ближайшую занятую границу
-        let maxEnd = rangeStart;
         const start = rangeStart;
-        const end = hour;
+        let maxEnd = start + 1;
         
-        // Определяем направление
-        if (start <= end) {
-            // Идем вправо
-            for (let h = start; h <= end; h++) {
-                if (bookedHours.has(h) && h > start) {
+        if (start <= hour) {
+            // Двигаемся вправо
+            for (let h = start + 1; h <= hour + 1; h++) {
+                if (bookedHours.has(h) || h > 21) {
                     break;
                 }
                 maxEnd = h + 1;
             }
         } else {
-            // Идем влево
+            // Двигаемся влево
             let minStart = start;
-            for (let h = start; h >= end; h--) {
-                if (bookedHours.has(h) && h < start) {
+            for (let h = start - 1; h >= hour; h--) {
+                if (bookedHours.has(h) || h < 9) {
                     break;
                 }
                 minStart = h;
             }
-            maxEnd = start + 1;
             rangeHours = [];
             for (let h = minStart; h < start + 1; h++) {
-                rangeHours.push(h);
+                if (!bookedHours.has(h)) {
+                    rangeHours.push(h);
+                }
             }
             Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, rangeHours);
             return;
         }
         
-        // Формируем диапазон от start до maxEnd
         rangeHours = [];
         for (let h = start; h < maxEnd; h++) {
-            rangeHours.push(h);
+            if (!bookedHours.has(h) && h < 21) {
+                rangeHours.push(h);
+            }
         }
         Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, rangeHours);
     }
@@ -2035,7 +1861,6 @@ function initDetailCanvas() {
     canvas.addEventListener('mousemove', handleMove);
     canvas.addEventListener('mouseup', handleEnd);
     canvas.addEventListener('mouseleave', () => {});
-    
     canvas.addEventListener('touchstart', handleStart, { passive: false });
     canvas.addEventListener('touchmove', handleMove, { passive: false });
     canvas.addEventListener('touchend', handleEnd, { passive: false });
@@ -2078,7 +1903,6 @@ function initNotifications() {
 function initWindowsEditor() {
     console.log('🔧 Инициализация окошек...');
     
-    // === DOM элементы ===
     const windowsPage = document.getElementById('windowsPage');
     const windowsPageCloseBtn = document.getElementById('windowsPageCloseBtn');
     const windowsPageEditBtn = document.getElementById('windowsPageEditBtn');
@@ -2095,7 +1919,6 @@ function initWindowsEditor() {
     const windowsPageFooterText = document.getElementById('windowsPageFooterText');
     const windowsPageContainer = document.getElementById('windowsPageContainer');
     
-    // === Состояние ===
     const windowsState = {
         mode: 'view',
         background: null,
@@ -2133,7 +1956,6 @@ function initWindowsEditor() {
                 const t = JSON.parse(data);
                 windowsState.background = t.background || null;
                 windowsState.textBlock = t.textBlock || { x: 100, y: 200, width: 600, height: 1350 };
-                
                 if (windowsState.background) {
                     const img = new Image();
                     img.onload = function() {
@@ -2171,13 +1993,11 @@ function initWindowsEditor() {
         if (!windowsState.background || !windowsState.textBlock) return;
         const lines = generateTextForEditorWindows();
         if (!lines || !lines.length) return;
-        
         const tempCanvas = document.createElement('canvas');
         const tempCtx = tempCanvas.getContext('2d');
         let maxWidth = 0;
         const fontSize = 32;
         tempCtx.font = 'bold ' + fontSize + 'px Montserrat, sans-serif';
-        
         for (let i = 0; i < lines.length; i++) {
             const clean = lines[i].replace(/~~/g, '');
             const metrics = tempCtx.measureText(clean);
@@ -2185,15 +2005,11 @@ function initWindowsEditor() {
                 maxWidth = metrics.width;
             }
         }
-        
         const padding = 20;
         let newWidth = maxWidth + padding * 2;
         if (newWidth < 400) newWidth = 400;
         if (newWidth > 880) newWidth = 880;
-        
-        const oldX = windowsState.textBlock.x;
         windowsState.textBlock.width = Math.floor(newWidth);
-        
         const maxX = W - newWidth - 20;
         if (windowsState.textBlock.x > maxX) {
             windowsState.textBlock.x = Math.max(20, maxX);
@@ -2210,12 +2026,10 @@ function initWindowsEditor() {
         const todayMonth = now.getMonth() + 1;
         const todayHour = now.getHours();
         const lines = [];
-        
         for (let d = 1; d <= days; d++) {
             const date = new Date(year, month - 1, d);
             const ds = String(d).padStart(2, '0') + '.' + String(month).padStart(2, '0');
             const dateKey = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-            
             let isPastDay = false;
             if (month < todayMonth && year <= todayYear) {
                 isPastDay = true;
@@ -2230,7 +2044,6 @@ function initWindowsEditor() {
             } else if (year < todayYear) {
                 isPastDay = true;
             }
-            
             const booked = new Set();
             const dayRecords = windowsState.recordsData[dateKey] || [];
             for (let r = 0; r < dayRecords.length; r++) {
@@ -2241,7 +2054,6 @@ function initWindowsEditor() {
                     }
                 }
             }
-            
             const timeParts = [];
             for (let t = 0; t < TIMES.length; t++) {
                 if (booked.has(TIMES[t]) || isPastDay) {
@@ -2302,12 +2114,10 @@ function initWindowsEditor() {
             }
         }
         if (current) parts.push({ text: current, strike: strike });
-        
         let cx = x;
         ctx.font = 'bold ' + fontSize + 'px Montserrat, sans-serif';
         ctx.textBaseline = 'top';
         ctx.textAlign = 'left';
-        
         for (let p = 0; p < parts.length; p++) {
             const w = ctx.measureText(parts[p].text).width;
             ctx.fillStyle = '#000000';
@@ -2337,14 +2147,12 @@ function initWindowsEditor() {
             hideHintForWindows();
             return;
         }
-        
         const bg = windowsState.background;
         const tb = windowsState.textBlock;
         const renderCanvas = document.createElement('canvas');
         renderCanvas.width = W;
         renderCanvas.height = H;
         const renderCtx = renderCanvas.getContext('2d');
-        
         const img = new Image();
         img.onload = function() {
             renderCtx.drawImage(img, 0, 0, W, H);
@@ -2371,7 +2179,6 @@ function initWindowsEditor() {
             renderCtx.textBaseline = 'bottom';
             renderCtx.fillText('Окошки ' + currentYear + '-' + String(currentMonth).padStart(2, '0'), W - 20, H - 20);
             renderCtx.restore();
-            
             windowsState.previewImageData = renderCanvas.toDataURL('image/png');
             if (windowsState.mode === 'view') {
                 windowsPagePreview.src = windowsState.previewImageData;
@@ -2396,12 +2203,10 @@ function initWindowsEditor() {
             windowsPageCanvas.style.display = 'none';
             return;
         }
-        
         windowsPagePreview.style.display = 'none';
         windowsPageCanvas.style.display = 'block';
         ctx.clearRect(0, 0, W, H);
         drawCheckerboardForWindows();
-        
         if (windowsState.background && windowsState.cachedImage) {
             try {
                 ctx.drawImage(windowsState.cachedImage, 0, 0, W, H);
@@ -2416,7 +2221,6 @@ function initWindowsEditor() {
                 return;
             } catch (e) {}
         }
-        
         if (windowsState.background && !windowsState.cachedImage) {
             const img = new Image();
             img.onload = function() {
@@ -2504,7 +2308,6 @@ function initWindowsEditor() {
         ctx.setLineDash([6, 4]);
         ctx.strokeRect(b.x, b.y, b.width, b.height);
         ctx.restore();
-        
         const corners = [
             { x: b.x, y: b.y },
             { x: b.x + b.width, y: b.y + b.height }
@@ -2875,11 +2678,9 @@ function initWindowsEditor() {
         windowsPageCanvas.addEventListener('mousedown', onPointerDownForWindows);
         document.addEventListener('mousemove', onPointerMoveForWindows);
         document.addEventListener('mouseup', onPointerUpForWindows);
-        
         windowsPageCanvas.addEventListener('touchstart', onPointerDownForWindows, { passive: false });
         windowsPageCanvas.addEventListener('touchmove', onPointerMoveForWindows, { passive: false });
         windowsPageCanvas.addEventListener('touchend', onPointerUpForWindows, { passive: false });
-        
         window.addEventListener('resize', resizeCanvasForWindows);
         console.log('✅ Внутренние окошки инициализированы');
     }

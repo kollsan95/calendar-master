@@ -102,13 +102,11 @@ async function loadMastersList() {
             }
         }
         
-        // Если мастеров нет, добавляем текущего пользователя
         const currentUser = getCurrentUser();
         if (masters.length === 0 && currentUser && currentUser.name) {
             masters.push(currentUser.name);
         }
         
-        // Обновляем select
         const select = document.getElementById('modalMasterName');
         if (select) {
             const currentValue = select.value;
@@ -120,7 +118,6 @@ async function loadMastersList() {
                 select.appendChild(option);
             });
             
-            // Выбираем текущего пользователя по умолчанию
             if (currentUser && currentUser.name) {
                 if (masters.includes(currentUser.name)) {
                     select.value = currentUser.name;
@@ -230,6 +227,11 @@ function getCleanupDays() {
 // ============================================
 
 async function initFirebase() {
+    const loader = document.getElementById('loader');
+    if (loader) {
+        loader.style.display = 'none';
+    }
+    
     try {
         if (typeof firebase === 'undefined') {
             console.error('❌ Firebase SDK не загружен');
@@ -260,7 +262,6 @@ async function initFirebase() {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
     console.log('🚀 Приложение загружено');
@@ -286,7 +287,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================
 
 async function loadRecords() {
-    // ✅ СКРЫВАЕМ ЛОГОТИП СРАЗУ
     const loader = document.getElementById('loader');
     if (loader) {
         loader.style.display = 'none';
@@ -305,7 +305,12 @@ async function loadRecords() {
         if (firebaseSync) {
             firebaseSync.syncRecords((data) => {
                 recordsData = data;
-                renderCalendar();
+                
+                const container = document.getElementById('calendarContainer');
+                if (container) {
+                    container.innerHTML = '';
+                    renderCalendarContent(container);
+                }
                 
                 if (document.getElementById('detailContainer').style.display === 'block') {
                     const d = Detail.currentDay, 
@@ -331,7 +336,6 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
         clientPhone = '';
     }
     
-    // Получаем текущего пользователя
     const user = getCurrentUser();
     const masterSelect = document.getElementById('modalMasterName');
     const masterName = masterSelect ? masterSelect.value : (user ? user.name : 'Мастер');
@@ -487,22 +491,23 @@ function renderCalendar(direction) {
     const container = document.getElementById('calendarContainer');
     if (!container) return;
     
-    // ✅ СКРЫВАЕМ ЛОГОТИП ЗАГРУЗКИ
     const loader = document.getElementById('loader');
     if (loader) {
         loader.style.display = 'none';
     }
     
-    // Если есть направление - делаем анимацию
+    container.innerHTML = '';
+    
     if (direction && !isAnimating) {
         isAnimating = true;
         
-        const oldContent = container.innerHTML;
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'position:relative;overflow:hidden;height:auto;';
-        wrapper.innerHTML = oldContent;
-        container.innerHTML = '';
         container.appendChild(wrapper);
+        
+        const oldContent = document.createElement('div');
+        oldContent.innerHTML = renderCalendarContentHTML();
+        wrapper.appendChild(oldContent);
         
         const newContent = document.createElement('div');
         newContent.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
@@ -510,11 +515,11 @@ function renderCalendar(direction) {
         newContent.style.transition = 'none';
         container.appendChild(newContent);
         
-        renderCalendarContent(newContent);
+        newContent.innerHTML = renderCalendarContentHTML();
         
         requestAnimationFrame(() => {
-            wrapper.style.transition = 'transform 0.3s ease';
-            wrapper.style.transform = direction === 'next' ? 'translateX(-100%)' : 'translateX(100%)';
+            oldContent.style.transition = 'transform 0.3s ease';
+            oldContent.style.transform = direction === 'next' ? 'translateX(-100%)' : 'translateX(100%)';
             
             newContent.style.transition = 'transform 0.3s ease';
             newContent.style.transform = 'translateX(0)';
@@ -522,63 +527,82 @@ function renderCalendar(direction) {
         
         setTimeout(() => {
             container.innerHTML = '';
-            renderCalendarContent(container);
+            container.innerHTML = renderCalendarContentHTML();
             isAnimating = false;
         }, 350);
         
         return;
     }
     
-    renderCalendarContent(container);
+    container.innerHTML = renderCalendarContentHTML();
 }
 
-function renderCalendarContent(container) {
-    const header = document.createElement('div');
-    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0 10px;border-bottom:1px solid #E0F2F1;';
-    header.innerHTML = `
-        <button id="prevMonth" style="background:none;border:none;font-size:24px;color:#008080;cursor:pointer;padding:0 12px;">‹</button>
-        <span style="font-size:18px;font-weight:600;color:#008080;">${new Date(currentYear, currentMonth - 1).toLocaleString('ru', { month: 'long', year: 'numeric' })}</span>
-        <button id="nextMonth" style="background:none;border:none;font-size:24px;color:#008080;cursor:pointer;padding:0 12px;">›</button>
-    `;
-    container.appendChild(header);
+function renderCalendarContentHTML() {
+    let html = '';
     
-    const grid = document.createElement('div');
-    grid.className = 'calendar-grid';
+    html += `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0 10px;border-bottom:1px solid #E0F2F1;">
+            <button id="prevMonth" style="background:none;border:none;font-size:24px;color:#008080;cursor:pointer;padding:0 12px;">‹</button>
+            <span style="font-size:18px;font-weight:600;color:#008080;">${new Date(currentYear, currentMonth - 1).toLocaleString('ru', { month: 'long', year: 'numeric' })}</span>
+            <button id="nextMonth" style="background:none;border:none;font-size:24px;color:#008080;cursor:pointer;padding:0 12px;">›</button>
+        </div>
+    `;
+    
+    html += `<div class="calendar-grid">`;
+    
     ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].forEach(day => {
-        const el = document.createElement('div');
-        el.style.cssText = 'text-align:center;font-size:10px;font-weight:600;color:#7B8D8E;padding:2px 0 4px;text-transform:uppercase;';
-        el.textContent = day;
-        grid.appendChild(el);
+        html += `<div style="text-align:center;font-size:10px;font-weight:600;color:#7B8D8E;padding:2px 0 4px;text-transform:uppercase;">${day}</div>`;
     });
     
     const firstDay = new Date(currentYear, currentMonth - 1, 1);
     const lastDay = new Date(currentYear, currentMonth, 0);
     for (let i = 1; i < (firstDay.getDay() || 7); i++) {
-        const empty = document.createElement('div');
-        empty.style.cssText = 'aspect-ratio:1;';
-        grid.appendChild(empty);
+        html += `<div style="aspect-ratio:1;"></div>`;
     }
     
     for (let d = 1; d <= lastDay.getDate(); d++) {
-        const cell = document.createElement('div');
-        cell.className = 'day-cell';
         const isPast = isDayPast(currentYear, currentMonth, d);
-        const canvas = document.createElement('canvas');
-        canvas.width = 120;
-        canvas.height = 120;
-        canvas.style.cssText = 'width:100%;height:100%;cursor:pointer;border-radius:50%;display:block;';
-        drawTile(canvas, d, isPast);
-        canvas.addEventListener('click', () => openDetail(d, currentMonth, currentYear));
+        const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+        let dayRecords = recordsData[dateKey] || [];
+        if (!Array.isArray(dayRecords)) {
+            dayRecords = Object.values(dayRecords);
+        }
+        
+        const user = getCurrentUser();
+        const userId = user ? user.id : null;
+        
+        let hasBookings = false;
+        for (const r of dayRecords) {
+            if (r.startHour !== undefined && r.endHour !== undefined) {
+                hasBookings = true;
+                break;
+            }
+        }
+        
+        html += `<div class="day-cell" style="position:relative;aspect-ratio:1;width:100%;">
+            <canvas id="day_${d}" width="120" height="120" style="width:100%;height:100%;cursor:pointer;border-radius:50%;display:block;"></canvas>`;
+        
         if (isPast) {
-            const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;background:rgba(200,200,200,0.3);pointer-events:none;';
-            cell.style.position = 'relative';
-            cell.appendChild(canvas);
-            cell.appendChild(overlay);
-        } else cell.appendChild(canvas);
-        grid.appendChild(cell);
+            html += `<div style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;background:rgba(200,200,200,0.3);pointer-events:none;"></div>`;
+        }
+        html += `</div>`;
     }
-    container.appendChild(grid);
+    
+    html += `</div>`;
+    return html;
+}
+
+function renderCalendarContent(container) {
+    container.innerHTML = renderCalendarContentHTML();
+    
+    // Рисуем каждый день
+    const canvases = container.querySelectorAll('canvas[id^="day_"]');
+    canvases.forEach(canvas => {
+        const day = parseInt(canvas.id.split('_')[1]);
+        const isPast = isDayPast(currentYear, currentMonth, day);
+        drawTile(canvas, day, isPast);
+        canvas.addEventListener('click', () => openDetail(day, currentMonth, currentYear));
+    });
 }
 
 function drawTile(canvas, day, isPast) {
@@ -609,7 +633,6 @@ function drawTile(canvas, day, isPast) {
         dayRecords = Object.values(dayRecords);
     }
     
-    // Защита от дублирования
     if (Array.isArray(dayRecords) && dayRecords.length > 0) {
         const seen = new Set();
         dayRecords = dayRecords.filter(record => {
@@ -621,7 +644,6 @@ function drawTile(canvas, day, isPast) {
         });
     }
     
-    // Получаем текущего пользователя
     const user = getCurrentUser();
     const userId = user ? user.id : null;
     
@@ -639,7 +661,7 @@ function drawTile(canvas, day, isPast) {
                 isBooked = true;
                 serviceType = r.serviceType;
                 isOwn = r.userId === userId;
-                color = COLORS[serviceType] || GRAY;
+                color = isOwn ? (COLORS[serviceType] || GRAY) : GRAY;
                 break;
             }
         }
@@ -654,7 +676,6 @@ function drawTile(canvas, day, isPast) {
         
         if (isBooked) {
             const alpha = isPast ? '20' : '40';
-            // Если запись не своя - серая заливка
             const fillColor = isOwn ? color + alpha : GRAY + '40';
             const strokeColor = isOwn ? (isPast ? color + '60' : color) : GRAY;
             
@@ -729,16 +750,16 @@ function initFilters() {
 //  МОДАЛКА ЗАПИСИ
 // ============================================
 
-function openModal(day, month, year, selectedRange, recordId) {
+function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     const overlay = document.getElementById('modalOverlay');
     if (!overlay) return;
     
-    // Загружаем список мастеров
     loadMastersList();
     
     editingRecordId = recordId || null;
     const dateKey = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
     const isNew = !recordId;
+    const readOnly = isReadOnly || false;
     
     let isDayOff = false;
     if (recordId) {
@@ -751,14 +772,14 @@ function openModal(day, month, year, selectedRange, recordId) {
     
     const letterTab = document.getElementById('modalTabLetter');
     if (letterTab) {
-        letterTab.style.pointerEvents = (isNew || isDayOff) ? 'none' : 'auto';
-        letterTab.style.opacity = (isNew || isDayOff) ? '0.5' : '1';
+        letterTab.style.pointerEvents = (isNew || isDayOff || readOnly) ? 'none' : 'auto';
+        letterTab.style.opacity = (isNew || isDayOff || readOnly) ? '0.5' : '1';
     }
     
     if (isNew) { currentModalTab = 'main'; switchTab('main'); }
     else { switchTab(currentModalTab); }
     
-    document.getElementById('modalTitle').textContent = isNew ? '📝 Новая запись' : '✏️ Редактирование записи';
+    document.getElementById('modalTitle').textContent = isNew ? '📝 Новая запись' : (readOnly ? '👁️ Просмотр записи' : '✏️ Редактирование записи');
     document.getElementById('modalDate').textContent = formatModalDate(dateKey);
     
     function toggleClientFields(serviceType) {
@@ -766,7 +787,7 @@ function openModal(day, month, year, selectedRange, recordId) {
         const nameGroup = document.getElementById('modalClientName').closest('.form-group');
         const phoneGroup = document.getElementById('modalClientPhone').closest('.form-group');
         
-        if (isDayOffField) {
+        if (isDayOffField || readOnly) {
             document.getElementById('modalClientName').value = '';
             document.getElementById('modalClientPhone').value = '';
             if (nameGroup) nameGroup.style.display = 'none';
@@ -794,12 +815,34 @@ function openModal(day, month, year, selectedRange, recordId) {
             overlay.dataset.deleteDate = record.date;
             overlay.dataset.deleteService = record.serviceType;
             
-            if (record.serviceType !== 'Выходной') {
+            if (record.serviceType !== 'Выходной' && !readOnly) {
                 renderLetterTemplates(record);
             } else {
-                document.getElementById('modalLetterContainer').innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">Для выходного дня шаблоны не доступны</p>';
+                document.getElementById('modalLetterContainer').innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">Шаблоны не доступны</p>';
             }
             toggleClientFields(record.serviceType);
+            
+            if (readOnly) {
+                document.getElementById('modalService').disabled = true;
+                document.getElementById('modalStartHour').disabled = true;
+                document.getElementById('modalEndHour').disabled = true;
+                document.getElementById('modalClientName').disabled = true;
+                document.getElementById('modalClientPhone').disabled = true;
+                document.getElementById('modalNote').disabled = true;
+                document.getElementById('modalMasterName').disabled = true;
+                document.getElementById('modalSave').style.display = 'none';
+                document.getElementById('modalDeleteTopBtn').style.display = 'none';
+            } else {
+                document.getElementById('modalService').disabled = false;
+                document.getElementById('modalStartHour').disabled = false;
+                document.getElementById('modalEndHour').disabled = false;
+                document.getElementById('modalClientName').disabled = false;
+                document.getElementById('modalClientPhone').disabled = false;
+                document.getElementById('modalNote').disabled = false;
+                document.getElementById('modalMasterName').disabled = false;
+                document.getElementById('modalSave').style.display = 'block';
+                document.getElementById('modalDeleteTopBtn').style.display = 'block';
+            }
         } else {
             editingRecordId = null;
             document.getElementById('modalService').value = 'Кератин';
@@ -818,11 +861,9 @@ function openModal(day, month, year, selectedRange, recordId) {
         document.getElementById('modalLetterContainer').innerHTML = '';
         toggleClientFields('Кератин');
         
-        // Устанавливаем мастера по умолчанию
         const user = getCurrentUser();
         const masterSelect = document.getElementById('modalMasterName');
         if (user && user.name && masterSelect) {
-            // Проверяем, есть ли имя в списке
             const options = masterSelect.options;
             let found = false;
             for (let i = 0; i < options.length; i++) {
@@ -833,7 +874,6 @@ function openModal(day, month, year, selectedRange, recordId) {
                 }
             }
             if (!found && options.length > 0) {
-                // Добавляем имя пользователя в список
                 const option = document.createElement('option');
                 option.value = user.name;
                 option.textContent = user.name;
@@ -844,7 +884,7 @@ function openModal(day, month, year, selectedRange, recordId) {
     }
     
     document.getElementById('modalLoading').style.display = 'none';
-    document.getElementById('modalSave').disabled = false;
+    document.getElementById('modalSave').disabled = readOnly;
     overlay.style.display = 'flex';
     overlay.dataset.date = dateKey;
 }
@@ -1439,6 +1479,9 @@ const Detail = {
         track.innerHTML = '';
         const daysOfWeek = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
         
+        const user = getCurrentUser();
+        const userId = user ? user.id : null;
+        
         months.forEach(({m, y}) => {
             for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) {
                 const wrapper = document.createElement('div');
@@ -1490,9 +1533,14 @@ const Detail = {
                     const hour = 9 + i;
                     const angleStart = startAngle + i * hourWidth;
                     const angleEnd = angleStart + hourWidth;
-                    let isBooked = false, color = GRAY;
+                    let isBooked = false, color = GRAY, isOwn = false;
                     for (const r of dayRecords) {
-                        if (hour >= r.startHour && hour < r.endHour) { isBooked = true; color = COLORS[r.serviceType] || GRAY; break; }
+                        if (hour >= r.startHour && hour < r.endHour) {
+                            isBooked = true;
+                            isOwn = r.userId === userId;
+                            color = isOwn ? (COLORS[r.serviceType] || GRAY) : GRAY;
+                            break;
+                        }
                     }
                     ctx.beginPath();
                     ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
@@ -1500,9 +1548,11 @@ const Detail = {
                     ctx.arc(cx, cy, innerRadius, angleEnd, angleStart);
                     ctx.closePath();
                     if (isBooked) {
-                        ctx.fillStyle = isPast ? color + '20' : color + '40';
+                        const fillColor = isOwn ? color + '40' : GRAY + '40';
+                        const strokeColor = isOwn ? (isPast ? color + '60' : color) : GRAY;
+                        ctx.fillStyle = isPast ? color + '20' : fillColor;
                         ctx.fill();
-                        ctx.strokeStyle = isPast ? color + '60' : color;
+                        ctx.strokeStyle = isPast ? color + '60' : strokeColor;
                         ctx.lineWidth = 1.5;
                         ctx.stroke();
                     } else {
@@ -1537,7 +1587,7 @@ const Detail = {
         });
     },
     
-    drawDetailTile(day, month, year, highlightHours) {
+    drawDetailTile: function(day, month, year, highlightHours) {
         const canvas = document.getElementById('detailCanvas');
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -1568,7 +1618,6 @@ const Detail = {
             dayRecords = Object.values(dayRecords);
         }
         
-        // Получаем текущего пользователя
         const user = getCurrentUser();
         const userId = user ? user.id : null;
         
@@ -1582,12 +1631,12 @@ const Detail = {
             const angleEnd = angleStart + hourWidth;
             let isBooked = false, color = GRAY, serviceType = '', isOwn = false;
             for (const r of dayRecords) {
-                if (hour >= r.startHour && hour < r.endHour) { 
-                    isBooked = true; 
-                    serviceType = r.serviceType; 
+                if (hour >= r.startHour && hour < r.endHour) {
+                    isBooked = true;
+                    serviceType = r.serviceType;
                     isOwn = r.userId === userId;
-                    color = COLORS[serviceType] || GRAY; 
-                    break; 
+                    color = isOwn ? (COLORS[serviceType] || GRAY) : GRAY;
+                    break;
                 }
             }
             const isHighlighted = highlightHours.indexOf(hour) !== -1;
@@ -1596,8 +1645,8 @@ const Detail = {
             ctx.arc(cx, cy, radius, angleStart, angleEnd);
             ctx.arc(cx, cy, innerRadius, angleEnd, angleStart);
             ctx.closePath();
+            
             if (isBooked) {
-                // Если запись не своя - серая заливка
                 const fillColor = isOwn ? color + '40' : GRAY + '40';
                 const strokeColor = isOwn ? (isPast ? color + '60' : color) : GRAY;
                 
@@ -1637,14 +1686,13 @@ const Detail = {
         }
     },
     
-    updateRecordsList(day, month, year) {
+    updateRecordsList: function(day, month, year) {
         const dateKey = year + '-' + String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
         let dayRecords = recordsData[dateKey] || [];
         if (!Array.isArray(dayRecords)) {
             dayRecords = Object.values(dayRecords);
         }
         
-        // Получаем текущего пользователя
         const user = getCurrentUser();
         const userId = user ? user.id : null;
         
@@ -1668,13 +1716,11 @@ const Detail = {
             let info = '<strong>' + start + ' — ' + end + '</strong>';
             info += ' <span style="color:' + (isOwn ? '#008080' : '#7B8D8E') + ';font-weight:500;margin-left:6px;">' + record.serviceType + '</span>';
             
-            // Только свои записи показывают клиента
             if (isOwn && record.serviceType !== 'Выходной') {
                 if (record.clientName) info += ' <span style="margin-left:8px;font-size:12px;color:#37474F;">' + record.clientName + '</span>';
                 if (record.clientPhone) info += ' <span style="margin-left:8px;font-size:12px;color:#7B8D8E;">' + record.clientPhone + '</span>';
             }
             
-            // Мастер всегда виден
             if (record.master) {
                 info += ' <span style="margin-left:8px;font-size:11px;color:#7B8D8E;">👤 ' + record.master + '</span>';
             }
@@ -1685,7 +1731,7 @@ const Detail = {
                 if (isOwn) {
                     openModal(day, month, year, null, record.id);
                 } else {
-                    showToast('ℹ️ Это запись другого мастера', 'info');
+                    openModal(day, month, year, null, record.id, true);
                 }
             });
             li.addEventListener('mouseenter', function() { 
@@ -1810,7 +1856,7 @@ function initCarousel() {
 }
 
 // ============================================
-//  ДЕТАЛЬНЫЙ CANVAS (выделение диапазона)
+//  ДЕТАЛЬНЫЙ CANVAS (ВЫДЕЛЕНИЕ ДИАПАЗОНА)
 // ============================================
 
 function initDetailCanvas() {
@@ -1818,6 +1864,7 @@ function initDetailCanvas() {
     if (!canvas) return;
     let rangeStart = null, rangeHours = [], isRangeDragging = false;
     let singleClickTimeout = null;
+    let currentUserId = null;
     
     function getHourFromEvent(e) {
         const rect = canvas.getBoundingClientRect();
@@ -1838,18 +1885,62 @@ function initDetailCanvas() {
         return 9 + rawHour % WORKING_HOURS;
     }
     
+    function getBookedHours(dateKey) {
+        const bookedHours = new Set();
+        let dayRecords = recordsData[dateKey] || [];
+        if (!Array.isArray(dayRecords)) {
+            dayRecords = Object.values(dayRecords);
+        }
+        for (const r of dayRecords) {
+            for (let h = r.startHour; h < r.endHour; h++) {
+                bookedHours.add(h);
+            }
+        }
+        return bookedHours;
+    }
+    
     function handleStart(e) {
         e.preventDefault();
         const hour = getHourFromEvent(e);
         if (hour === null) return;
         
         const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(Detail.currentDay || 1);
+        const user = getCurrentUser();
+        currentUserId = user ? user.id : null;
+        
         let dayRecords = recordsData[dateKey] || [];
         if (!Array.isArray(dayRecords)) {
             dayRecords = Object.values(dayRecords);
         }
-        let isBooked = dayRecords.some(r => hour >= r.startHour && hour < r.endHour);
-        if (isBooked) return;
+        
+        // Проверяем, есть ли запись на этом часе
+        let clickedRecord = null;
+        for (const r of dayRecords) {
+            if (hour >= r.startHour && hour < r.endHour) {
+                clickedRecord = r;
+                break;
+            }
+        }
+        
+        // Если нажали на существующую запись
+        if (clickedRecord) {
+            const isOwn = clickedRecord.userId === currentUserId;
+            if (isOwn) {
+                openModal(Detail.currentDay, currentMonth, currentYear, null, clickedRecord.id);
+            } else {
+                openModal(Detail.currentDay, currentMonth, currentYear, null, clickedRecord.id, true);
+            }
+            return;
+        }
+        
+        // Если слот свободен - начинаем выделение
+        const bookedHours = getBookedHours(dateKey);
+        
+        // Проверяем, не занят ли этот час
+        if (bookedHours.has(hour)) {
+            showToast('⏰ Это время уже занято', 'error');
+            return;
+        }
         
         isRangeDragging = true;
         rangeStart = hour;
@@ -1879,11 +1970,46 @@ function initDetailCanvas() {
         const hour = getHourFromEvent(e);
         if (hour === null) return;
         
-        const range = [];
-        const start = rangeStart, end = hour;
-        if (start <= end) for (let h = start; h <= end; h++) range.push(h);
-        else for (let h = start; h >= end; h--) range.push(h);
-        rangeHours = range;
+        const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(Detail.currentDay || 1);
+        const bookedHours = getBookedHours(dateKey);
+        
+        // Находим ближайшую занятую границу
+        let maxEnd = rangeStart;
+        const start = rangeStart;
+        const end = hour;
+        
+        // Определяем направление
+        if (start <= end) {
+            // Идем вправо
+            for (let h = start; h <= end; h++) {
+                if (bookedHours.has(h) && h > start) {
+                    break;
+                }
+                maxEnd = h + 1;
+            }
+        } else {
+            // Идем влево
+            let minStart = start;
+            for (let h = start; h >= end; h--) {
+                if (bookedHours.has(h) && h < start) {
+                    break;
+                }
+                minStart = h;
+            }
+            maxEnd = start + 1;
+            rangeHours = [];
+            for (let h = minStart; h < start + 1; h++) {
+                rangeHours.push(h);
+            }
+            Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, rangeHours);
+            return;
+        }
+        
+        // Формируем диапазон от start до maxEnd
+        rangeHours = [];
+        for (let h = start; h < maxEnd; h++) {
+            rangeHours.push(h);
+        }
         Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, rangeHours);
     }
     
@@ -1893,14 +2019,9 @@ function initDetailCanvas() {
         if (singleClickTimeout) { clearTimeout(singleClickTimeout); singleClickTimeout = null; }
         isRangeDragging = false;
         
-        if (rangeHours.length >= 2) {
+        if (rangeHours.length >= 1) {
             const start = Math.min(...rangeHours);
             const end = Math.max(...rangeHours) + 1;
-            currentModalTab = 'main';
-            openModal(Detail.currentDay, currentMonth, currentYear, { start, end });
-        } else if (rangeHours.length === 1) {
-            const start = rangeHours[0];
-            const end = start + 1;
             rangeHours = [];
             Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, []);
             currentModalTab = 'main';
@@ -1941,7 +2062,7 @@ function showToast(message, type = 'success') {
 }
 
 // ============================================
-//  УВЕДОМЛЕНИЯ (инициализация)
+//  УВЕДОМЛЕНИЯ (ИНИЦИАЛИЗАЦИЯ)
 // ============================================
 
 function initNotifications() {
@@ -1951,15 +2072,817 @@ function initNotifications() {
 }
 
 // ============================================
-//  ОКОШКИ (внутренняя страница)
-//  ПОЛНЫЙ КОД ДЛЯ ОКОШЕК
-//  (вставляется здесь, но для краткости я пропускаю, 
-//   так как он занимает ~800 строк)
-//  В реальном проекте - вся логика из предыдущей версии
+//  ОКОШКИ (ВНУТРЕННЯЯ СТРАНИЦА)
 // ============================================
 
 function initWindowsEditor() {
-    // ... (весь существующий код окошек)
-    // Для краткости я не вставляю его сюда, но он должен быть
-    console.log('✅ Внутренние окошки инициализированы');
+    console.log('🔧 Инициализация окошек...');
+    
+    // === DOM элементы ===
+    const windowsPage = document.getElementById('windowsPage');
+    const windowsPageCloseBtn = document.getElementById('windowsPageCloseBtn');
+    const windowsPageEditBtn = document.getElementById('windowsPageEditBtn');
+    const windowsPageViewBtn = document.getElementById('windowsPageViewBtn');
+    const windowsPageSaveBtn = document.getElementById('windowsPageSaveBtn');
+    const windowsPageResetBtn = document.getElementById('windowsPageResetBtn');
+    const windowsPageAddBgBtn = document.getElementById('windowsPageAddBgBtn');
+    const windowsPageFileInput = document.getElementById('windowsPageFileInput');
+    const windowsPageCanvas = document.getElementById('windowsPageCanvas');
+    const windowsPagePreview = document.getElementById('windowsPagePreview');
+    const windowsPageHint = document.getElementById('windowsPageHint');
+    const windowsPageSpinner = document.getElementById('windowsPageSpinner');
+    const windowsPageBadge = document.getElementById('windowsPageBadge');
+    const windowsPageFooterText = document.getElementById('windowsPageFooterText');
+    const windowsPageContainer = document.getElementById('windowsPageContainer');
+    
+    // === Состояние ===
+    const windowsState = {
+        mode: 'view',
+        background: null,
+        cachedImage: null,
+        textBlock: { x: 100, y: 200, width: 600, height: 1350 },
+        hasChanges: false,
+        previewImageData: null,
+        isDragging: false,
+        isResizing: false,
+        dragOffset: { x: 0, y: 0 },
+        resizeCorner: null,
+        startPos: { x: 0, y: 0 },
+        selected: false,
+        recordsData: {}
+    };
+    
+    const W = 1080;
+    const H = 1920;
+    const TIMES = ['09:00', '12:00', '15:00', '18:00'];
+    const WEEKDAYS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    let ctx = windowsPageCanvas.getContext('2d');
+    let hintTimeout = null;
+    
+    function loadRecordsForWindows() {
+        try {
+            windowsState.recordsData = recordsData || {};
+        } catch (e) {}
+    }
+    
+    function loadTemplateForWindows() {
+        try {
+            const key = 'windowsTemplate_' + currentYear + '-' + String(currentMonth).padStart(2, '0');
+            const data = localStorage.getItem(key);
+            if (data) {
+                const t = JSON.parse(data);
+                windowsState.background = t.background || null;
+                windowsState.textBlock = t.textBlock || { x: 100, y: 200, width: 600, height: 1350 };
+                
+                if (windowsState.background) {
+                    const img = new Image();
+                    img.onload = function() {
+                        windowsState.cachedImage = this;
+                        windowsState.hasChanges = false;
+                        autoFitWidthForWindows();
+                        generatePreviewImageForWindows();
+                        renderForWindows();
+                        hideSpinnerForWindows();
+                    };
+                    img.onerror = function() {
+                        windowsState.cachedImage = null;
+                        renderForWindows();
+                        hideSpinnerForWindows();
+                    };
+                    img.src = windowsState.background;
+                    return;
+                }
+            } else {
+                windowsState.background = null;
+                windowsState.cachedImage = null;
+                windowsState.textBlock = { x: 100, y: 200, width: 600, height: 1350 };
+                windowsState.previewImageData = null;
+            }
+            renderForWindows();
+            hideSpinnerForWindows();
+        } catch (e) {
+            console.error('❌ Ошибка загрузки шаблона:', e);
+            renderForWindows();
+            hideSpinnerForWindows();
+        }
+    }
+    
+    function autoFitWidthForWindows() {
+        if (!windowsState.background || !windowsState.textBlock) return;
+        const lines = generateTextForEditorWindows();
+        if (!lines || !lines.length) return;
+        
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        let maxWidth = 0;
+        const fontSize = 32;
+        tempCtx.font = 'bold ' + fontSize + 'px Montserrat, sans-serif';
+        
+        for (let i = 0; i < lines.length; i++) {
+            const clean = lines[i].replace(/~~/g, '');
+            const metrics = tempCtx.measureText(clean);
+            if (metrics.width > maxWidth) {
+                maxWidth = metrics.width;
+            }
+        }
+        
+        const padding = 20;
+        let newWidth = maxWidth + padding * 2;
+        if (newWidth < 400) newWidth = 400;
+        if (newWidth > 880) newWidth = 880;
+        
+        const oldX = windowsState.textBlock.x;
+        windowsState.textBlock.width = Math.floor(newWidth);
+        
+        const maxX = W - newWidth - 20;
+        if (windowsState.textBlock.x > maxX) {
+            windowsState.textBlock.x = Math.max(20, maxX);
+        }
+    }
+    
+    function generateTextForWindows() {
+        const now = new Date();
+        const year = currentYear;
+        const month = currentMonth;
+        const days = new Date(year, month, 0).getDate();
+        const today = now.getDate();
+        const todayYear = now.getFullYear();
+        const todayMonth = now.getMonth() + 1;
+        const todayHour = now.getHours();
+        const lines = [];
+        
+        for (let d = 1; d <= days; d++) {
+            const date = new Date(year, month - 1, d);
+            const ds = String(d).padStart(2, '0') + '.' + String(month).padStart(2, '0');
+            const dateKey = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+            
+            let isPastDay = false;
+            if (month < todayMonth && year <= todayYear) {
+                isPastDay = true;
+            } else if (month > todayMonth) {
+                isPastDay = false;
+            } else if (month === todayMonth && year === todayYear) {
+                if (d < today) {
+                    isPastDay = true;
+                } else if (d === today && todayHour >= 21) {
+                    isPastDay = true;
+                }
+            } else if (year < todayYear) {
+                isPastDay = true;
+            }
+            
+            const booked = new Set();
+            const dayRecords = windowsState.recordsData[dateKey] || [];
+            for (let r = 0; r < dayRecords.length; r++) {
+                for (let t = 0; t < TIMES.length; t++) {
+                    const hour = parseInt(TIMES[t].split(':')[0]);
+                    if (hour >= dayRecords[r].startHour && hour < dayRecords[r].endHour) {
+                        booked.add(TIMES[t]);
+                    }
+                }
+            }
+            
+            const timeParts = [];
+            for (let t = 0; t < TIMES.length; t++) {
+                if (booked.has(TIMES[t]) || isPastDay) {
+                    timeParts.push('~~' + TIMES[t] + '~~');
+                } else {
+                    timeParts.push(TIMES[t]);
+                }
+            }
+            lines.push(ds + '(' + WEEKDAYS[date.getDay()] + ') - ' + timeParts.join(', '));
+        }
+        return lines;
+    }
+    
+    function generateTextForEditorWindows() {
+        const year = currentYear;
+        const month = currentMonth;
+        const days = new Date(year, month, 0).getDate();
+        const lines = [];
+        for (let d = 1; d <= days; d++) {
+            const date = new Date(year, month - 1, d);
+            const ds = String(d).padStart(2, '0') + '.' + String(month).padStart(2, '0');
+            const timeParts = TIMES.map(function(t) { return t; });
+            lines.push(ds + '(' + WEEKDAYS[date.getDay()] + ') - ' + timeParts.join(', '));
+        }
+        return lines;
+    }
+    
+    function calcFontSizeForWindows(lines, maxWidth, maxHeight) {
+        const c = document.createElement('canvas');
+        const cx = c.getContext('2d');
+        for (let s = 32; s > 14; s--) {
+            cx.font = 'bold ' + s + 'px Montserrat, sans-serif';
+            let maxW = 0;
+            for (let i = 0; i < lines.length; i++) {
+                const clean = lines[i].replace(/~~/g, '');
+                const w = cx.measureText(clean).width;
+                if (w > maxW) maxW = w;
+            }
+            const totalH = lines.length * s * 1.4;
+            if (maxW <= maxWidth && totalH <= maxHeight) {
+                return s;
+            }
+        }
+        return 14;
+    }
+    
+    function drawLineForWindows(ctx, line, x, y, fontSize) {
+        const parts = [];
+        let current = '';
+        let strike = false;
+        for (let i = 0; i < line.length; i++) {
+            if (line[i] === '~' && line[i+1] === '~') {
+                if (current) { parts.push({ text: current, strike: strike }); current = ''; }
+                strike = !strike;
+                i++;
+            } else {
+                current += line[i];
+            }
+        }
+        if (current) parts.push({ text: current, strike: strike });
+        
+        let cx = x;
+        ctx.font = 'bold ' + fontSize + 'px Montserrat, sans-serif';
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'left';
+        
+        for (let p = 0; p < parts.length; p++) {
+            const w = ctx.measureText(parts[p].text).width;
+            ctx.fillStyle = '#000000';
+            ctx.fillText(parts[p].text, cx, y);
+            if (parts[p].strike) {
+                ctx.save();
+                ctx.strokeStyle = '#FF0000';
+                ctx.lineWidth = Math.max(4, fontSize / 4);
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                const centerY = y + fontSize / 2;
+                ctx.moveTo(cx - 2, centerY);
+                ctx.lineTo(cx + w + 2, centerY);
+                ctx.stroke();
+                ctx.restore();
+            }
+            cx += w;
+        }
+    }
+    
+    function generatePreviewImageForWindows() {
+        if (!windowsState.background) {
+            windowsState.previewImageData = null;
+            windowsPagePreview.style.display = 'none';
+            windowsPagePreview.src = '';
+            windowsPageCanvas.style.display = 'block';
+            hideHintForWindows();
+            return;
+        }
+        
+        const bg = windowsState.background;
+        const tb = windowsState.textBlock;
+        const renderCanvas = document.createElement('canvas');
+        renderCanvas.width = W;
+        renderCanvas.height = H;
+        const renderCtx = renderCanvas.getContext('2d');
+        
+        const img = new Image();
+        img.onload = function() {
+            renderCtx.drawImage(img, 0, 0, W, H);
+            const b = tb;
+            const padding = 20;
+            const lines = generateTextForWindows();
+            if (lines && lines.length) {
+                const fontSize = calcFontSizeForWindows(lines, b.width - padding * 2, b.height - padding * 2);
+                const lineHeight = fontSize * 1.4;
+                const totalHeight = lines.length * lineHeight;
+                const startY = b.y + padding + (b.height - padding * 2 - totalHeight) / 2;
+                renderCtx.textAlign = 'left';
+                renderCtx.textBaseline = 'top';
+                for (let i = 0; i < lines.length; i++) {
+                    const yPos = startY + i * lineHeight;
+                    drawLineForWindows(renderCtx, lines[i], b.x + padding, yPos, fontSize);
+                }
+            }
+            renderCtx.save();
+            renderCtx.globalAlpha = 0.2;
+            renderCtx.fillStyle = '#666';
+            renderCtx.font = '20px Montserrat, sans-serif';
+            renderCtx.textAlign = 'right';
+            renderCtx.textBaseline = 'bottom';
+            renderCtx.fillText('Окошки ' + currentYear + '-' + String(currentMonth).padStart(2, '0'), W - 20, H - 20);
+            renderCtx.restore();
+            
+            windowsState.previewImageData = renderCanvas.toDataURL('image/png');
+            if (windowsState.mode === 'view') {
+                windowsPagePreview.src = windowsState.previewImageData;
+                windowsPagePreview.style.display = 'block';
+                windowsPageCanvas.style.display = 'none';
+                showHintForWindows();
+            }
+        };
+        img.onerror = function() {
+            windowsState.previewImageData = null;
+            windowsPagePreview.style.display = 'none';
+            windowsPagePreview.src = '';
+            windowsPageCanvas.style.display = 'block';
+        };
+        img.src = bg;
+    }
+    
+    function renderForWindows() {
+        if (windowsState.mode === 'view' && windowsState.previewImageData && windowsState.background) {
+            windowsPagePreview.src = windowsState.previewImageData;
+            windowsPagePreview.style.display = 'block';
+            windowsPageCanvas.style.display = 'none';
+            return;
+        }
+        
+        windowsPagePreview.style.display = 'none';
+        windowsPageCanvas.style.display = 'block';
+        ctx.clearRect(0, 0, W, H);
+        drawCheckerboardForWindows();
+        
+        if (windowsState.background && windowsState.cachedImage) {
+            try {
+                ctx.drawImage(windowsState.cachedImage, 0, 0, W, H);
+                if (windowsState.mode === 'edit') {
+                    drawTextBlockEditorForWindows();
+                } else {
+                    drawTextBlockForWindows();
+                }
+                if (windowsState.mode === 'edit' && (windowsState.selected || windowsState.isDragging || windowsState.isResizing)) {
+                    drawSelectionForWindows();
+                }
+                return;
+            } catch (e) {}
+        }
+        
+        if (windowsState.background && !windowsState.cachedImage) {
+            const img = new Image();
+            img.onload = function() {
+                windowsState.cachedImage = this;
+                renderForWindows();
+            };
+            img.onerror = function() {
+                drawPlaceholderForWindows();
+            };
+            img.src = windowsState.background;
+            return;
+        }
+        drawPlaceholderForWindows();
+    }
+    
+    function drawCheckerboardForWindows() {
+        const size = 40;
+        for (let y = 0; y < H; y += size) {
+            for (let x = 0; x < W; x += size) {
+                ctx.fillStyle = (Math.floor(x/size) + Math.floor(y/size)) % 2 === 0 ? '#FFFFFF' : '#E8E8E8';
+                ctx.fillRect(x, y, size, size);
+            }
+        }
+    }
+    
+    function drawPlaceholderForWindows() {
+        ctx.fillStyle = '#F5F5F5';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#B0BEC5';
+        ctx.font = '40px Montserrat, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('📷 Нет шаблона', W/2, H/2 - 40);
+        ctx.font = '24px Montserrat, sans-serif';
+        ctx.fillText('Нажмите ✏️ для редактирования', W/2, H/2 + 40);
+        if (windowsState.mode === 'edit') {
+            ctx.fillStyle = '#008080';
+            ctx.font = '20px Montserrat, sans-serif';
+            ctx.fillText('и добавьте подложку', W/2, H/2 + 80);
+        }
+    }
+    
+    function drawTextBlockForWindows() {
+        const b = windowsState.textBlock;
+        const padding = 20;
+        const lines = generateTextForWindows();
+        if (!lines || !lines.length) return;
+        const fontSize = calcFontSizeForWindows(lines, b.width - padding * 2, b.height - padding * 2);
+        const lineHeight = fontSize * 1.4;
+        const totalHeight = lines.length * lineHeight;
+        const startY = b.y + padding + (b.height - padding * 2 - totalHeight) / 2;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        for (let i = 0; i < lines.length; i++) {
+            const yPos = startY + i * lineHeight;
+            drawLineForWindows(ctx, lines[i], b.x + padding, yPos, fontSize);
+        }
+    }
+    
+    function drawTextBlockEditorForWindows() {
+        const b = windowsState.textBlock;
+        const padding = 20;
+        const lines = generateTextForEditorWindows();
+        if (!lines || !lines.length) return;
+        const fontSize = calcFontSizeForWindows(lines, b.width - padding * 2, b.height - padding * 2);
+        const lineHeight = fontSize * 1.4;
+        const totalHeight = lines.length * lineHeight;
+        const startY = b.y + padding + (b.height - padding * 2 - totalHeight) / 2;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold ' + fontSize + 'px Montserrat, sans-serif';
+        for (let i = 0; i < lines.length; i++) {
+            const yPos = startY + i * lineHeight;
+            ctx.fillText(lines[i], b.x + padding, yPos);
+        }
+    }
+    
+    function drawSelectionForWindows() {
+        const b = windowsState.textBlock;
+        const size = 50;
+        ctx.save();
+        ctx.strokeStyle = '#008080';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeRect(b.x, b.y, b.width, b.height);
+        ctx.restore();
+        
+        const corners = [
+            { x: b.x, y: b.y },
+            { x: b.x + b.width, y: b.y + b.height }
+        ];
+        for (let c = 0; c < corners.length; c++) {
+            ctx.save();
+            ctx.fillStyle = '#008080';
+            ctx.shadowColor = 'rgba(0,0,0,0.3)';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(corners[c].x, corners[c].y, size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 22px Montserrat, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('↕', corners[c].x, corners[c].y);
+            ctx.restore();
+        }
+    }
+    
+    function isOnResizeCornerForWindows(x, y) {
+        const b = windowsState.textBlock;
+        const size = 80;
+        if (Math.abs(x - b.x) < size && Math.abs(y - b.y) < size) return 'tl';
+        if (Math.abs(x - (b.x + b.width)) < size && Math.abs(y - (b.y + b.height)) < size) return 'br';
+        return null;
+    }
+    
+    function isInTextBlockForWindows(x, y) {
+        const b = windowsState.textBlock;
+        const padding = 20;
+        return x >= b.x - padding && x <= b.x + b.width + padding && 
+               y >= b.y - padding && y <= b.y + b.height + padding;
+    }
+    
+    function getCoordsForWindows(e) {
+        const rect = windowsPageCanvas.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+        let clientX, clientY;
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        if (clientX === undefined || clientY === undefined) return { x: 0, y: 0 };
+        return {
+            x: Math.max(0, Math.min(W, (clientX - rect.left) * (windowsPageCanvas.width / rect.width))),
+            y: Math.max(0, Math.min(H, (clientY - rect.top) * (windowsPageCanvas.height / rect.height)))
+        };
+    }
+    
+    function onPointerDownForWindows(e) {
+        if (windowsState.mode !== 'edit' || !windowsState.background) return;
+        e.preventDefault();
+        const pos = getCoordsForWindows(e);
+        const corner = isOnResizeCornerForWindows(pos.x, pos.y);
+        if (corner) {
+            windowsState.isResizing = true;
+            windowsState.resizeCorner = corner;
+            windowsState.startPos = { x: pos.x, y: pos.y };
+            return;
+        }
+        if (isInTextBlockForWindows(pos.x, pos.y)) {
+            windowsState.isDragging = true;
+            windowsState.selected = true;
+            windowsState.dragOffset = { x: pos.x - windowsState.textBlock.x, y: pos.y - windowsState.textBlock.y };
+            renderForWindows();
+        } else {
+            windowsState.selected = false;
+            renderForWindows();
+        }
+    }
+    
+    function onPointerMoveForWindows(e) {
+        if (windowsState.mode !== 'edit') return;
+        e.preventDefault();
+        if (!windowsState.isDragging && !windowsState.isResizing) {
+            const pos = getCoordsForWindows(e);
+            const corner = isOnResizeCornerForWindows(pos.x, pos.y);
+            if (corner === 'tl') windowsPageCanvas.style.cursor = 'nwse-resize';
+            else if (corner === 'br') windowsPageCanvas.style.cursor = 'nesw-resize';
+            else if (isInTextBlockForWindows(pos.x, pos.y)) windowsPageCanvas.style.cursor = 'move';
+            else windowsPageCanvas.style.cursor = 'default';
+            return;
+        }
+        if (windowsState.isDragging) {
+            const pos = getCoordsForWindows(e);
+            const b = windowsState.textBlock;
+            b.x = Math.max(0, Math.min(W - b.width, pos.x - windowsState.dragOffset.x));
+            b.y = Math.max(0, Math.min(H - b.height, pos.y - windowsState.dragOffset.y));
+            windowsState.hasChanges = true;
+            renderForWindows();
+            return;
+        }
+        if (windowsState.isResizing) {
+            const pos = getCoordsForWindows(e);
+            const b = windowsState.textBlock;
+            const dx = pos.x - windowsState.startPos.x;
+            const dy = pos.y - windowsState.startPos.y;
+            if (windowsState.resizeCorner === 'br') {
+                b.width = Math.min(W - b.x, Math.max(200, b.width + dx));
+                b.height = Math.min(H - b.y, Math.max(200, b.height + dy));
+            } else if (windowsState.resizeCorner === 'tl') {
+                let newX = Math.max(0, b.x + dx);
+                let newY = Math.max(0, b.y + dy);
+                let newW = Math.max(200, b.width - dx);
+                let newH = Math.max(200, b.height - dy);
+                if (newX + newW > W) newW = W - newX;
+                if (newY + newH > H) newH = H - newY;
+                b.x = newX;
+                b.y = newY;
+                b.width = newW;
+                b.height = newH;
+            }
+            windowsState.startPos = { x: pos.x, y: pos.y };
+            windowsState.hasChanges = true;
+            renderForWindows();
+        }
+    }
+    
+    function onPointerUpForWindows(e) {
+        windowsState.isDragging = false;
+        windowsState.isResizing = false;
+        windowsState.resizeCorner = null;
+        windowsPageCanvas.style.cursor = 'default';
+    }
+    
+    function loadBackgroundForWindows(file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = W;
+                tempCanvas.height = H;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(img, 0, 0, W, H);
+                const compressedDataUrl = tempCanvas.toDataURL('image/jpeg', 0.7);
+                windowsState.background = compressedDataUrl;
+                const cached = new Image();
+                cached.onload = function() {
+                    windowsState.cachedImage = this;
+                    windowsState.hasChanges = true;
+                    autoFitWidthForWindows();
+                    generatePreviewImageForWindows();
+                    renderForWindows();
+                    showToastForWindows('✅ Подложка добавлена');
+                };
+                cached.onerror = function() {
+                    windowsState.cachedImage = null;
+                    renderForWindows();
+                    showToastForWindows('⚠️ Ошибка загрузки подложки', 'error');
+                };
+                cached.src = compressedDataUrl;
+            };
+            img.onerror = function() {
+                showToastForWindows('❌ Не удалось загрузить изображение', 'error');
+            };
+            img.src = event.target.result;
+        };
+        reader.onerror = function() {
+            showToastForWindows('❌ Ошибка чтения файла', 'error');
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    function saveTemplateForWindows() {
+        if (!windowsState.background) {
+            showToastForWindows('⚠️ Сначала добавьте подложку', 'error');
+            return;
+        }
+        const key = 'windowsTemplate_' + currentYear + '-' + String(currentMonth).padStart(2, '0');
+        localStorage.setItem(key, JSON.stringify({
+            background: windowsState.background,
+            textBlock: windowsState.textBlock
+        }));
+        windowsState.hasChanges = false;
+        generatePreviewImageForWindows();
+        showToastForWindows('✅ Шаблон сохранен для ' + currentYear + '-' + String(currentMonth).padStart(2, '0'));
+    }
+    
+    function resetAllForWindows() {
+        if (windowsState.hasChanges && !confirm('Есть несохраненные изменения. Сбросить?')) return;
+        windowsState.background = null;
+        windowsState.cachedImage = null;
+        windowsState.textBlock = { x: 100, y: 200, width: 600, height: 1350 };
+        windowsState.hasChanges = false;
+        windowsState.selected = false;
+        windowsState.isDragging = false;
+        windowsState.isResizing = false;
+        windowsState.previewImageData = null;
+        windowsPagePreview.style.display = 'none';
+        windowsPagePreview.src = '';
+        windowsPageCanvas.style.display = 'block';
+        hideHintForWindows();
+        const key = 'windowsTemplate_' + currentYear + '-' + String(currentMonth).padStart(2, '0');
+        localStorage.removeItem(key);
+        renderForWindows();
+        showToastForWindows('↺ Шаблон сброшен');
+    }
+    
+    function showHintForWindows() {
+        windowsPageHint.classList.add('show');
+        clearTimeout(hintTimeout);
+        hintTimeout = setTimeout(function() {
+            windowsPageHint.classList.remove('show');
+        }, 5000);
+    }
+    
+    function hideHintForWindows() {
+        windowsPageHint.classList.remove('show');
+        clearTimeout(hintTimeout);
+    }
+    
+    function showToastForWindows(message, type) {
+        type = type || 'info';
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 500;
+            background: ${type === 'error' ? '#C62828' : '#008080'};
+            color: #FFF; z-index: 9999; max-width: 90%; text-align: center;
+            animation: slideUp 0.3s ease; opacity: 0; transition: opacity 0.3s ease;
+            font-family: 'Montserrat', sans-serif;
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.style.opacity = '1'; }, 50);
+        setTimeout(function() { 
+            toast.style.opacity = '0'; 
+            setTimeout(function() { toast.remove(); }, 300); 
+        }, 3000);
+    }
+    
+    function hideSpinnerForWindows() {
+        windowsPageSpinner.style.display = 'none';
+    }
+    
+    function setModeForWindows(mode) {
+        windowsState.mode = mode;
+        if (mode === 'view') {
+            windowsPageBadge.textContent = '👁️ Просмотр';
+            windowsPageBadge.className = 'mode-badge view';
+            windowsPageFooterText.textContent = '👁️ Просмотр · Нажмите ✏️ для редактирования';
+            windowsPageEditBtn.style.display = 'inline-block';
+            windowsPageViewBtn.style.display = 'none';
+            windowsPageSaveBtn.style.display = 'none';
+            windowsPageResetBtn.style.display = 'none';
+            windowsPageAddBgBtn.style.display = 'none';
+            windowsPageFileInput.style.display = 'none';
+            windowsState.selected = false;
+            if (windowsState.previewImageData && windowsState.background) {
+                windowsPagePreview.src = windowsState.previewImageData;
+                windowsPagePreview.style.display = 'block';
+                windowsPageCanvas.style.display = 'none';
+                showHintForWindows();
+            } else {
+                windowsPagePreview.style.display = 'none';
+                windowsPagePreview.src = '';
+                windowsPageCanvas.style.display = 'block';
+                hideHintForWindows();
+            }
+        } else {
+            windowsPageBadge.textContent = '✏️ Редактирование';
+            windowsPageBadge.className = 'mode-badge';
+            windowsPageFooterText.textContent = '✏️ Редактирование · Перетаскивайте блок за текст';
+            windowsPageEditBtn.style.display = 'none';
+            windowsPageViewBtn.style.display = 'inline-block';
+            windowsPageSaveBtn.style.display = 'inline-block';
+            windowsPageResetBtn.style.display = 'inline-block';
+            windowsPageAddBgBtn.style.display = 'inline-block';
+            windowsPageFileInput.style.display = 'block';
+            windowsState.selected = true;
+            if (windowsState.background) {
+                autoFitWidthForWindows();
+            }
+            windowsPagePreview.style.display = 'none';
+            windowsPagePreview.src = '';
+            windowsPageCanvas.style.display = 'block';
+            hideHintForWindows();
+        }
+        renderForWindows();
+    }
+    
+    function openWindowsPage() {
+        windowsPage.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        loadRecordsForWindows();
+        loadTemplateForWindows();
+        setModeForWindows('view');
+        resizeCanvasForWindows();
+    }
+    
+    function closeWindowsPage() {
+        if (windowsState.hasChanges && !confirm('Есть несохраненные изменения. Закрыть?')) return;
+        windowsPage.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+    
+    function resizeCanvasForWindows() {
+        const containerWidth = windowsPageContainer.clientWidth - 16;
+        const containerHeight = windowsPageContainer.clientHeight - 16;
+        if (containerWidth <= 0 || containerHeight <= 0) {
+            setTimeout(resizeCanvasForWindows, 100);
+            return;
+        }
+        const aspect = W / H;
+        let width = Math.min(containerWidth, containerHeight * aspect);
+        let height = width / aspect;
+        if (height > containerHeight) {
+            height = containerHeight;
+            width = height * aspect;
+        }
+        windowsPageCanvas.style.width = Math.floor(width) + 'px';
+        windowsPageCanvas.style.height = Math.floor(height) + 'px';
+    }
+    
+    // === Инициализация ===
+    function init() {
+        document.getElementById('windowsBtn').addEventListener('click', function() {
+            localStorage.setItem('recordsData', JSON.stringify(recordsData));
+            openWindowsPage();
+        });
+        
+        windowsPageCloseBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            closeWindowsPage();
+        });
+        
+        windowsPageEditBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            setModeForWindows('edit');
+        });
+        
+        windowsPageViewBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            setModeForWindows('view');
+            if (windowsState.background) {
+                generatePreviewImageForWindows();
+            }
+        });
+        
+        windowsPageSaveBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            saveTemplateForWindows();
+        });
+        
+        windowsPageResetBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            resetAllForWindows();
+        });
+        
+        windowsPageFileInput.addEventListener('change', function(e) {
+            const file = this.files[0];
+            if (file) {
+                loadBackgroundForWindows(file);
+            }
+            this.value = '';
+        });
+        
+        windowsPageCanvas.addEventListener('mousedown', onPointerDownForWindows);
+        document.addEventListener('mousemove', onPointerMoveForWindows);
+        document.addEventListener('mouseup', onPointerUpForWindows);
+        
+        windowsPageCanvas.addEventListener('touchstart', onPointerDownForWindows, { passive: false });
+        windowsPageCanvas.addEventListener('touchmove', onPointerMoveForWindows, { passive: false });
+        windowsPageCanvas.addEventListener('touchend', onPointerUpForWindows, { passive: false });
+        
+        window.addEventListener('resize', resizeCanvasForWindows);
+        console.log('✅ Внутренние окошки инициализированы');
+    }
+    
+    init();
 }

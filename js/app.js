@@ -30,7 +30,7 @@ const DEFAULT_TEMPLATE = `{{Имя клиента}}, записала Вас:
 
 Процедура: {{Процедура}} 
 
-Мастер: {{Мастер}}
+Мастер: {{Мастер}} {{Телефон мастера}}
 
 Адрес: пр.Пушкина 81 вход со стороны проспекта в мой кабинет 
 
@@ -95,26 +95,38 @@ async function loadMastersList() {
         const masters = [];
         for (const key in users) {
             if (users[key].role === 'master' || users[key].role === 'admin') {
-                masters.push(users[key].name);
+                masters.push({
+                    name: users[key].name,
+                    phone: users[key].phone || ''
+                });
             }
         }
         const currentUser = getCurrentUser();
         if (masters.length === 0 && currentUser && currentUser.name) {
-            masters.push(currentUser.name);
+            masters.push({
+                name: currentUser.name,
+                phone: currentUser.phone || ''
+            });
         }
         const select = document.getElementById('modalMasterName');
         if (select) {
             select.innerHTML = '';
-            masters.forEach(name => {
+            masters.forEach(m => {
                 const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
+                option.value = m.name;
+                option.textContent = m.name + (m.phone ? ' (' + m.phone + ')' : '');
+                option.dataset.phone = m.phone || '';
                 select.appendChild(option);
             });
-            if (currentUser && currentUser.name && masters.includes(currentUser.name)) {
-                select.value = currentUser.name;
+            if (currentUser && currentUser.name) {
+                const found = Array.from(select.options).find(o => o.value === currentUser.name);
+                if (found) {
+                    select.value = currentUser.name;
+                } else if (masters.length > 0) {
+                    select.value = masters[0].name;
+                }
             } else if (masters.length > 0) {
-                select.value = masters[0];
+                select.value = masters[0].name;
             }
         }
         return masters;
@@ -122,6 +134,13 @@ async function loadMastersList() {
         console.error('❌ Ошибка загрузки мастеров:', error);
         return [];
     }
+}
+
+function getMasterPhoneByName(name) {
+    const select = document.getElementById('modalMasterName');
+    if (!select) return '';
+    const option = Array.from(select.options).find(o => o.value === name);
+    return option ? option.dataset.phone || '' : '';
 }
 
 // ============================================
@@ -183,13 +202,15 @@ function formatDateForLetter(dateStr) {
 function generateLetter(record, template) {
     let text = template;
     const fullServiceName = SERVICE_NAMES[record.serviceType] || record.serviceType;
+    const masterPhone = getMasterPhoneByName(record.master || '');
     const vars = {
         '{{Имя клиента}}': record.clientName || 'Клиент',
         '{{дата записи}}': formatDateForLetter(record.date),
         '{{время начала}}': String(record.startHour).padStart(2, '0') + ':00',
         '{{Телефон клиента}}': record.clientPhone || '',
         '{{Процедура}}': fullServiceName,
-        '{{Мастер}}': record.master || 'Мастер'
+        '{{Мастер}}': record.master || 'Мастер',
+        '{{Телефон мастера}}': masterPhone
     };
     for (const [key, val] of Object.entries(vars)) {
         text = text.replace(new RegExp(key, 'g'), val);
@@ -325,6 +346,34 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
         createdAt: firebase.database.ServerValue.TIMESTAMP
     };
     
+    // Если редактируем существующую запись
+    if (editingRecordId) {
+        record.id = editingRecordId;
+        try {
+            await firebaseSync.updateRecord(editingRecordId, date, record);
+            // Обновляем локальные данные
+            if (recordsData[date]) {
+                const idx = recordsData[date].findIndex(r => String(r.id) === String(editingRecordId));
+                if (idx !== -1) {
+                    recordsData[date][idx] = record;
+                }
+            }
+            addNotification('✏️ Обновлена запись: ' + serviceType + ' на ' + date + ' ' + startHour + ':00');
+            sendSystemNotification('Запись обновлена', serviceType + ' на ' + date + ' ' + startHour + ':00');
+            renderCalendar();
+            refreshDetail();
+            closeModal();
+            showToast('✅ Запись обновлена!');
+            editingRecordId = null;
+            return;
+        } catch (error) {
+            console.error('❌ Ошибка обновления:', error);
+            showToast('❌ Ошибка обновления', 'error');
+            return;
+        }
+    }
+    
+    // Новая запись
     try {
         const id = await firebaseSync.addRecord(record);
         record.id = id;
@@ -584,6 +633,7 @@ function drawTile(canvas, day, isPast) {
             if (hour >= r.startHour && hour < r.endHour) {
                 isBooked = true;
                 serviceType = r.serviceType;
+                // Проверяем по мастеру, а не по userId
                 isOwn = r.userId === userId;
                 color = isOwn ? (COLORS[serviceType] || GRAY) : GRAY;
                 break;
@@ -608,9 +658,10 @@ function drawTile(canvas, day, isPast) {
             ctx.lineWidth = 2.5;
             ctx.stroke();
         } else if (isFree && !isPast) {
-            ctx.fillStyle = 'rgba(0,200,100,0.15)';
+            // ✅ Сплошной зеленый цвет вместо полупрозрачного
+            ctx.fillStyle = '#4CAF50';
             ctx.fill();
-            ctx.strokeStyle = 'rgba(0,200,100,0.3)';
+            ctx.strokeStyle = '#388E3C';
             ctx.lineWidth = 1;
             ctx.stroke();
         } else {
@@ -750,6 +801,9 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
             });
             document.getElementById('modalSave').style.display = readOnly ? 'none' : 'block';
             document.getElementById('modalDeleteTopBtn').style.display = readOnly ? 'none' : 'block';
+            
+            // Обновляем список конечного времени
+            updateEndHourOptions(parseInt(document.getElementById('modalStartHour').value));
         } else {
             editingRecordId = null;
             document.getElementById('modalService').value = 'Кератин';
@@ -759,6 +813,7 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
             document.getElementById('modalLetterContainer').innerHTML = '';
             toggleClientFields('Кератин');
             document.getElementById('modalTitle').textContent = '📝 Новая запись';
+            updateEndHourOptions(9);
         }
     } else {
         document.getElementById('modalService').value = 'Кератин';
@@ -767,6 +822,7 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         ['modalClientName', 'modalClientPhone', 'modalNote'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('modalLetterContainer').innerHTML = '';
         toggleClientFields('Кератин');
+        updateEndHourOptions(selectedRange ? selectedRange.start : 9);
         
         const user = getCurrentUser();
         const masterSelect = document.getElementById('modalMasterName');
@@ -794,6 +850,26 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     document.getElementById('modalSave').disabled = readOnly;
     overlay.style.display = 'flex';
     overlay.dataset.date = dateKey;
+}
+
+function updateEndHourOptions(startHour) {
+    const endSelect = document.getElementById('modalEndHour');
+    if (!endSelect) return;
+    const currentValue = parseInt(endSelect.value);
+    endSelect.innerHTML = '';
+    for (let i = Math.max(10, startHour + 1); i <= 21; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = String(i).padStart(2, '0') + ':00';
+        endSelect.appendChild(option);
+    }
+    if (endSelect.options.length > 0) {
+        if (currentValue >= startHour + 1 && currentValue <= 21) {
+            endSelect.value = currentValue;
+        } else {
+            endSelect.value = endSelect.options[0].value;
+        }
+    }
 }
 
 function renderLetterTemplates(record) {
@@ -951,6 +1027,9 @@ function initModal() {
             option.textContent = String(i).padStart(2, '0') + ':00';
             startSelect.appendChild(option);
         }
+        startSelect.addEventListener('change', function() {
+            updateEndHourOptions(parseInt(this.value));
+        });
     }
     if (endSelect) {
         endSelect.innerHTML = '';
@@ -1570,8 +1649,10 @@ const Detail = {
             li.innerHTML = info;
             li.addEventListener('click', () => {
                 if (isOwn) {
-                    openModal(day, month, year, null, record.id);
+                    // Редактирование своей записи
+                    openModal(day, month, year, null, record.id, false);
                 } else {
+                    // Просмотр чужой записи
                     openModal(day, month, year, null, record.id, true);
                 }
             });
@@ -1694,6 +1775,7 @@ function initDetailCanvas() {
     if (!canvas) return;
     let rangeStart = null, rangeHours = [], isRangeDragging = false;
     let singleClickTimeout = null;
+    let lastHighlightedHour = null;
     
     function getHourFromEvent(e) {
         const rect = canvas.getBoundingClientRect();
@@ -1711,6 +1793,27 @@ function initDetailCanvas() {
         let rawHour = Math.floor((angle - Math.PI) / ((Math.PI*2)/WORKING_HOURS));
         if (rawHour < 0) rawHour += WORKING_HOURS;
         return 9 + rawHour % WORKING_HOURS;
+    }
+    
+    function getHourCenterAngle(hour) {
+        const startAngle = Math.PI;
+        const hourWidth = (Math.PI*2) / WORKING_HOURS;
+        return startAngle + (hour - 9) * hourWidth + hourWidth / 2;
+    }
+    
+    function getAngleFromEvent(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY);
+        if (clientX === undefined || clientY === undefined) return null;
+        const x = (clientX - rect.left) / rect.width * canvas.width;
+        const y = (clientY - rect.top) / rect.height * canvas.height;
+        const cx = canvas.width/2, cy = canvas.height/2;
+        const dist = Math.sqrt((x - cx)**2 + (y - cy)**2);
+        const radiusPx = canvas.width/2 - 20;
+        const innerRadiusPx = radiusPx * INNER_RADIUS_RATIO;
+        if (dist < innerRadiusPx || dist > radiusPx) return null;
+        return Math.atan2(y - cy, x - cx);
     }
     
     function getBookedHours(dateKey) {
@@ -1754,7 +1857,7 @@ function initDetailCanvas() {
         if (existingRecord) {
             const isOwn = existingRecord.userId === userId;
             if (isOwn) {
-                openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id);
+                openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id, false);
             } else {
                 openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id, true);
             }
@@ -1771,6 +1874,7 @@ function initDetailCanvas() {
         isRangeDragging = true;
         rangeStart = hour;
         rangeHours = [hour];
+        lastHighlightedHour = hour;
         Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, rangeHours);
         
         if (singleClickTimeout) clearTimeout(singleClickTimeout);
@@ -1782,7 +1886,7 @@ function initDetailCanvas() {
                 rangeHours = [];
                 Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, []);
                 currentModalTab = 'main';
-                openModal(Detail.currentDay, currentMonth, currentYear, { start, end });
+                openModal(Detail.currentDay, currentMonth, currentYear, { start, end }, null, false);
             }
             singleClickTimeout = null;
         }, 300);
@@ -1793,50 +1897,61 @@ function initDetailCanvas() {
         if (!isRangeDragging) return;
         if (singleClickTimeout) { clearTimeout(singleClickTimeout); singleClickTimeout = null; }
         
-        const hour = getHourFromEvent(e);
-        if (hour === null) return;
+        const angle = getAngleFromEvent(e);
+        if (angle === null) return;
         
         const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(Detail.currentDay || 1);
         const bookedHours = getBookedHours(dateKey);
-        
-        // Находим ближайшую занятую границу
         const start = rangeStart;
-        let maxEnd = start + 1;
+        const startAngleCenter = getHourCenterAngle(start);
+        let targetHour = null;
         
-        if (start <= hour) {
-            // Двигаемся вправо
-            for (let h = start + 1; h <= hour + 1; h++) {
-                if (bookedHours.has(h) || h > 21) {
+        // Определяем, в каком секторе находится курсор по углу
+        const hourWidth = (Math.PI*2) / WORKING_HOURS;
+        let rawAngle = angle - Math.PI;
+        if (rawAngle < 0) rawAngle += Math.PI * 2;
+        const index = Math.floor(rawAngle / hourWidth);
+        targetHour = 9 + (index % WORKING_HOURS);
+        if (targetHour < 9) targetHour += WORKING_HOURS;
+        if (targetHour > 20) targetHour = 20;
+        
+        if (targetHour === null || targetHour === lastHighlightedHour) return;
+        
+        // Проверяем, пересек ли курсор середину целевого сектора
+        const targetAngleCenter = getHourCenterAngle(targetHour);
+        let angleDiff = angle - targetAngleCenter;
+        if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        const threshold = hourWidth * 0.5;
+        
+        if (Math.abs(angleDiff) > threshold) return;
+        
+        lastHighlightedHour = targetHour;
+        const end = targetHour;
+        
+        let newRange = [];
+        if (start <= end) {
+            for (let h = start; h <= end; h++) {
+                if (!bookedHours.has(h) && h < 21) {
+                    newRange.push(h);
+                } else if (h > start) {
                     break;
                 }
-                maxEnd = h + 1;
             }
         } else {
-            // Двигаемся влево
-            let minStart = start;
-            for (let h = start - 1; h >= hour; h--) {
-                if (bookedHours.has(h) || h < 9) {
+            for (let h = start; h >= end; h--) {
+                if (!bookedHours.has(h) && h >= 9) {
+                    newRange.unshift(h);
+                } else if (h < start) {
                     break;
                 }
-                minStart = h;
             }
-            rangeHours = [];
-            for (let h = minStart; h < start + 1; h++) {
-                if (!bookedHours.has(h)) {
-                    rangeHours.push(h);
-                }
-            }
-            Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, rangeHours);
-            return;
         }
         
-        rangeHours = [];
-        for (let h = start; h < maxEnd; h++) {
-            if (!bookedHours.has(h) && h < 21) {
-                rangeHours.push(h);
-            }
+        if (newRange.length > 0) {
+            rangeHours = newRange;
+            Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, rangeHours);
         }
-        Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, rangeHours);
     }
     
     function handleEnd(e) {
@@ -1844,6 +1959,7 @@ function initDetailCanvas() {
         if (!isRangeDragging) return;
         if (singleClickTimeout) { clearTimeout(singleClickTimeout); singleClickTimeout = null; }
         isRangeDragging = false;
+        lastHighlightedHour = null;
         
         if (rangeHours.length >= 1) {
             const start = Math.min(...rangeHours);
@@ -1851,7 +1967,7 @@ function initDetailCanvas() {
             rangeHours = [];
             Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, []);
             currentModalTab = 'main';
-            openModal(Detail.currentDay, currentMonth, currentYear, { start, end });
+            openModal(Detail.currentDay, currentMonth, currentYear, { start, end }, null, false);
         }
         rangeHours = [];
         Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, []);
@@ -1932,15 +2048,39 @@ function initWindowsEditor() {
         resizeCorner: null,
         startPos: { x: 0, y: 0 },
         selected: false,
-        recordsData: {}
+        recordsData: {},
+        showWeekends: true
     };
     
     const W = 1080;
     const H = 1920;
-    const TIMES = ['09:00', '12:00', '15:00', '18:00'];
+    const TIMES = ['09:00', '12:00', '15:00', '18:00 (19:00)'];
     const WEEKDAYS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     let ctx = windowsPageCanvas.getContext('2d');
     let hintTimeout = null;
+    
+    // Создаем галочку для выходных
+    const checkboxContainer = document.createElement('div');
+    checkboxContainer.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0;';
+    checkboxContainer.innerHTML = `
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#37474F;cursor:pointer;">
+            <input type="checkbox" id="windowsShowWeekends" checked style="width:18px;height:18px;cursor:pointer;">
+            С моими выходными
+        </label>
+    `;
+    const footer = document.getElementById('windowsPageFooter');
+    if (footer) {
+        footer.parentNode.insertBefore(checkboxContainer, footer);
+    }
+    
+    const weekendsCheckbox = document.getElementById('windowsShowWeekends');
+    if (weekendsCheckbox) {
+        weekendsCheckbox.addEventListener('change', function() {
+            windowsState.showWeekends = this.checked;
+            generatePreviewImageForWindows();
+            renderForWindows();
+        });
+    }
     
     function loadRecordsForWindows() {
         try {
@@ -2016,6 +2156,12 @@ function initWindowsEditor() {
         }
     }
     
+    function isWeekend(day) {
+        const date = new Date(currentYear, currentMonth - 1, day);
+        const dayOfWeek = date.getDay();
+        return dayOfWeek === 0 || dayOfWeek === 6;
+    }
+    
     function generateTextForWindows() {
         const now = new Date();
         const year = currentYear;
@@ -2026,10 +2172,14 @@ function initWindowsEditor() {
         const todayMonth = now.getMonth() + 1;
         const todayHour = now.getHours();
         const lines = [];
+        const showWeekends = windowsState.showWeekends;
+        
         for (let d = 1; d <= days; d++) {
             const date = new Date(year, month - 1, d);
             const ds = String(d).padStart(2, '0') + '.' + String(month).padStart(2, '0');
             const dateKey = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+            const isWeekendDay = isWeekend(d);
+            
             let isPastDay = false;
             if (month < todayMonth && year <= todayYear) {
                 isPastDay = true;
@@ -2044,23 +2194,29 @@ function initWindowsEditor() {
             } else if (year < todayYear) {
                 isPastDay = true;
             }
+            
             const booked = new Set();
             const dayRecords = windowsState.recordsData[dateKey] || [];
             for (let r = 0; r < dayRecords.length; r++) {
                 for (let t = 0; t < TIMES.length; t++) {
-                    const hour = parseInt(TIMES[t].split(':')[0]);
+                    let hour = parseInt(TIMES[t].split(':')[0]);
+                    // Для 18:00 (19:00) берем 18
+                    if (TIMES[t].includes('(')) {
+                        hour = 18;
+                    }
                     if (hour >= dayRecords[r].startHour && hour < dayRecords[r].endHour) {
                         booked.add(TIMES[t]);
                     }
                 }
             }
+            
             const timeParts = [];
             for (let t = 0; t < TIMES.length; t++) {
-                if (booked.has(TIMES[t]) || isPastDay) {
-                    timeParts.push('~~' + TIMES[t] + '~~');
-                } else {
-                    timeParts.push(TIMES[t]);
+                let shouldStrike = booked.has(TIMES[t]) || isPastDay;
+                if (showWeekends && isWeekendDay && !booked.has(TIMES[t])) {
+                    shouldStrike = true;
                 }
+                timeParts.push(shouldStrike ? '~~' + TIMES[t] + '~~' : TIMES[t]);
             }
             lines.push(ds + '(' + WEEKDAYS[date.getDay()] + ') - ' + timeParts.join(', '));
         }

@@ -2181,7 +2181,6 @@ function initWindowsEditor() {
             const date = new Date(year, month - 1, d);
             const ds = String(d).padStart(2, '0') + '.' + String(month).padStart(2, '0');
             const dateKey = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-            const isWeekendDay = isWeekend(d);
             
             let isPastDay = false;
             if (month < todayMonth && year <= todayYear) {
@@ -2200,6 +2199,8 @@ function initWindowsEditor() {
             
             const booked = new Set();
             const dayRecords = windowsState.recordsData[dateKey] || [];
+            
+            // Собираем все занятые слоты (включая "Выходной")
             for (let r = 0; r < dayRecords.length; r++) {
                 for (let t = 0; t < TIMES.length; t++) {
                     let hour = parseInt(TIMES[t].split(':')[0]);
@@ -2212,12 +2213,33 @@ function initWindowsEditor() {
                 }
             }
             
+            // Собираем слоты, которые являются "Выходными" (для галочки)
+            const weekendSlots = new Set();
+            if (showWeekends) {
+                for (let r = 0; r < dayRecords.length; r++) {
+                    if (dayRecords[r].serviceType === 'Выходной') {
+                        for (let t = 0; t < TIMES.length; t++) {
+                            let hour = parseInt(TIMES[t].split(':')[0]);
+                            if (TIMES[t].includes('(')) {
+                                hour = 18;
+                            }
+                            if (hour >= dayRecords[r].startHour && hour < dayRecords[r].endHour) {
+                                weekendSlots.add(TIMES[t]);
+                            }
+                        }
+                    }
+                }
+            }
+            
             const timeParts = [];
             for (let t = 0; t < TIMES.length; t++) {
                 let shouldStrike = booked.has(TIMES[t]) || isPastDay;
-                if (showWeekends && isWeekendDay && !booked.has(TIMES[t])) {
+                
+                // Если галочка активна И этот слот является "Выходным" - зачеркиваем
+                if (weekendSlots.has(TIMES[t])) {
                     shouldStrike = true;
                 }
+                
                 timeParts.push(shouldStrike ? '~~' + TIMES[t] + '~~' : TIMES[t]);
             }
             lines.push(ds + '(' + WEEKDAYS[date.getDay()] + ') - ' + timeParts.join(', '));

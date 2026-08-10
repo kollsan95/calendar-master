@@ -1,4 +1,4 @@
-const CACHE_NAME = 'calendar-pwa-v5';
+const CACHE_NAME = 'calendar-pwa-v6';
 const urlsToCache = [
     '/',
     '/index.html',

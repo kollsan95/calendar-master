@@ -620,7 +620,7 @@ function drawTile(canvas, day, isPast) {
     }
     
     const user = getCurrentUser();
-    const userId = user ? user.id : null;
+    const currentUserName = user ? user.name : null;
     const hourWidth = (Math.PI*2) / WORKING_HOURS;
     const startAngle = Math.PI;
     
@@ -633,8 +633,8 @@ function drawTile(canvas, day, isPast) {
             if (hour >= r.startHour && hour < r.endHour) {
                 isBooked = true;
                 serviceType = r.serviceType;
-                // Проверяем по мастеру, а не по userId
-                isOwn = r.userId === userId;
+                // Проверяем по полю "master", а не по userId
+                isOwn = currentUserName && r.master === currentUserName;
                 color = isOwn ? (COLORS[serviceType] || GRAY) : GRAY;
                 break;
             }
@@ -658,7 +658,6 @@ function drawTile(canvas, day, isPast) {
             ctx.lineWidth = 2.5;
             ctx.stroke();
         } else if (isFree && !isPast) {
-            // ✅ Сплошной зеленый цвет вместо полупрозрачного
             ctx.fillStyle = '#4CAF50';
             ctx.fill();
             ctx.strokeStyle = '#388E3C';
@@ -1407,7 +1406,7 @@ const Detail = {
         }
     },
     
-    populateCarousel(day, month, year) {
+    populateCarousel: function(day, month, year) {
         const track = document.getElementById('carouselTrack');
         if (!track) return;
         const months = [
@@ -1418,7 +1417,7 @@ const Detail = {
         track.innerHTML = '';
         const daysOfWeek = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
         const user = getCurrentUser();
-        const userId = user ? user.id : null;
+        const currentUserName = user ? user.name : null;
         
         months.forEach(({m, y}) => {
             for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) {
@@ -1471,7 +1470,8 @@ const Detail = {
                     for (const r of dayRecords) {
                         if (hour >= r.startHour && hour < r.endHour) {
                             isBooked = true;
-                            isOwn = r.userId === userId;
+                            // Проверяем по полю "master", а не по userId
+                            isOwn = currentUserName && r.master === currentUserName;
                             color = isOwn ? (COLORS[r.serviceType] || GRAY) : GRAY;
                             break;
                         }
@@ -1549,7 +1549,7 @@ const Detail = {
             dayRecords = Object.values(dayRecords);
         }
         const user = getCurrentUser();
-        const userId = user ? user.id : null;
+        const currentUserName = user ? user.name : null;
         const hourWidth = (Math.PI*2) / WORKING_HOURS;
         const startAngle = Math.PI;
         const isPast = isDayPast(year, month, day);
@@ -1563,7 +1563,8 @@ const Detail = {
                 if (hour >= r.startHour && hour < r.endHour) {
                     isBooked = true;
                     serviceType = r.serviceType;
-                    isOwn = r.userId === userId;
+                    // Проверяем по полю "master", а не по userId
+                    isOwn = currentUserName && r.master === currentUserName;
                     color = isOwn ? (COLORS[serviceType] || GRAY) : GRAY;
                     break;
                 }
@@ -1619,7 +1620,7 @@ const Detail = {
             dayRecords = Object.values(dayRecords);
         }
         const user = getCurrentUser();
-        const userId = user ? user.id : null;
+        const currentUserName = user ? user.name : null;
         const list = document.getElementById('detailRecordsList');
         list.innerHTML = '';
         if (dayRecords.length === 0) {
@@ -1628,7 +1629,8 @@ const Detail = {
         }
         dayRecords.sort((a,b) => a.startHour - b.startHour);
         dayRecords.forEach(record => {
-            const isOwn = record.userId === userId;
+            // Проверяем по полю "master", а не по userId
+            const isOwn = currentUserName && record.master === currentUserName;
             const color = isOwn ? (COLORS[record.serviceType] || '#008080') : GRAY;
             const borderColor = isOwn ? color : GRAY;
             const bgColor = isOwn ? color + '30' : GRAY + '20';
@@ -1850,12 +1852,13 @@ function initDetailCanvas() {
         
         const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(Detail.currentDay || 1);
         const user = getCurrentUser();
-        const userId = user ? user.id : null;
+        const currentUserName = user ? user.name : null;
         
         // Проверяем, есть ли запись на этом часе
         const existingRecord = getRecordAtHour(dateKey, hour);
         if (existingRecord) {
-            const isOwn = existingRecord.userId === userId;
+            // Проверяем по полю "master", а не по userId
+            const isOwn = currentUserName && existingRecord.master === currentUserName;
             if (isOwn) {
                 openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id, false);
             } else {
@@ -2200,7 +2203,6 @@ function initWindowsEditor() {
             for (let r = 0; r < dayRecords.length; r++) {
                 for (let t = 0; t < TIMES.length; t++) {
                     let hour = parseInt(TIMES[t].split(':')[0]);
-                    // Для 18:00 (19:00) берем 18
                     if (TIMES[t].includes('(')) {
                         hour = 18;
                     }

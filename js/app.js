@@ -874,18 +874,14 @@ function drawTile(canvas, day, isPast) {
         let drawRightBorder = false;
         
         if (isBooked) {
-            // Проверяем предыдущий час
             const prevState = i > 0 ? hourState[i - 1] : null;
             const isPrevBooked = prevState && prevState.isBooked && prevState.serviceType === state.serviceType && prevState.isOwn === state.isOwn;
-            
-            // Проверяем следующий час
             const nextState = i < 11 ? hourState[i + 1] : null;
             const isNextBooked = nextState && nextState.isBooked && nextState.serviceType === state.serviceType && nextState.isOwn === state.isOwn;
             
-            // Левый край: если предыдущий не занят той же записью ИЛИ это первый сектор
+            // ✅ ЛЕВАЯ ГРАНИЦА: рисуем ТОЛЬКО если предыдущий НЕ занят той же записью
             drawLeftBorder = !isPrevBooked;
-            
-            // Правый край: если следующий не занят той же записью ИЛИ это последний сектор
+            // ✅ ПРАВАЯ ГРАНИЦА: рисуем ТОЛЬКО если следующий НЕ занят той же записью
             drawRightBorder = !isNextBooked;
         }
         
@@ -896,12 +892,10 @@ function drawTile(canvas, day, isPast) {
         ctx.closePath();
         
         if (isBooked) {
-            // Заливка
             const fillColor = isOwn ? color : getUIColor('Чужие записи');
             ctx.fillStyle = shouldBeGray ? getUIColor('Чужие записи') : fillColor;
             ctx.fill();
             
-            // Границы
             const strokeColor = isOwn ? color : getUIColor('Чужие записи');
             const actualColor = shouldBeGray ? getUIColor('Чужие записи') : strokeColor;
             
@@ -919,27 +913,19 @@ function drawTile(canvas, day, isPast) {
             ctx.lineWidth = 2.5;
             ctx.stroke();
             
-            // Левая граница (радиус) - белая если не нужно рисовать левый край
+            // ✅ ЛЕВАЯ ГРАНИЦА: цветная если первый сектор, иначе белая
             ctx.beginPath();
             ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
             ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
-            if (drawLeftBorder) {
-                ctx.strokeStyle = actualColor;
-            } else {
-                ctx.strokeStyle = '#FFFFFF';
-            }
+            ctx.strokeStyle = drawLeftBorder ? actualColor : '#FFFFFF';
             ctx.lineWidth = 2.5;
             ctx.stroke();
             
-            // Правая граница (радиус) - белая если не нужно рисовать правый край
+            // ✅ ПРАВАЯ ГРАНИЦА: цветная если последний сектор, иначе белая
             ctx.beginPath();
             ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
             ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
-            if (drawRightBorder) {
-                ctx.strokeStyle = actualColor;
-            } else {
-                ctx.strokeStyle = '#FFFFFF';
-            }
+            ctx.strokeStyle = drawRightBorder ? actualColor : '#FFFFFF';
             ctx.lineWidth = 2.5;
             ctx.stroke();
             

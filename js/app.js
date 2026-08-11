@@ -5,21 +5,61 @@
 // === КОНСТАНТЫ ===
 const INNER_RADIUS_RATIO = 0.5;
 
-// === ПРОЦЕДУРЫ (единая структура) ===
+// === ПРОЦЕДУРЫ (единая структура с ID) ===
 const SERVICES = {
-    'Кератин': { displayName: 'Кератиновое выпрямление', color: '#D4AF37' },
-    'Ботокс': { displayName: 'Ботокс для волос', color: '#4A90E2' },
-    'Холодное': { displayName: 'Холодное восстановление', color: '#A8D8EA' },
-    'Полировка': { displayName: 'Полировка волос', color: '#7B8D8E' },
-    'Выходной': { displayName: 'Выходной день', color: '#9E9E9E' }
+    'service_1': {
+        id: 'service_1',
+        name: 'Кератин',
+        displayName: 'Кератиновое выпрямление',
+        color: '#D4AF37'
+    },
+    'service_2': {
+        id: 'service_2',
+        name: 'Ботокс',
+        displayName: 'Ботокс для волос',
+        color: '#4A90E2'
+    },
+    'service_3': {
+        id: 'service_3',
+        name: 'Холодное',
+        displayName: 'Холодное восстановление',
+        color: '#A8D8EA'
+    },
+    'service_4': {
+        id: 'service_4',
+        name: 'Полировка',
+        displayName: 'Полировка волос',
+        color: '#7B8D8E'
+    },
+    'service_5': {
+        id: 'service_5',
+        name: 'Выходной',
+        displayName: 'Выходной день',
+        color: '#9E9E9E'
+    }
 };
 
 const SERVICE_KEYS = Object.keys(SERVICES);
 
+// Для быстрого доступа
+const SERVICE_BY_ID = {};
+const SERVICE_BY_NAME = {};
+SERVICE_KEYS.forEach(key => {
+    const service = SERVICES[key];
+    SERVICE_BY_ID[service.id] = service;
+    SERVICE_BY_NAME[service.name] = service;
+});
+
 // === СИСТЕМНЫЕ ЦВЕТА ===
 const UI_COLORS = {
-    'Чужие записи': { displayName: 'Записи других мастеров', color: '#E0E0E0' },
-    'Свободные слоты': { displayName: 'Свободные временные слоты', color: '#4CAF50' }
+    'Чужие записи': {
+        displayName: 'Записи других мастеров',
+        color: '#E0E0E0'
+    },
+    'Свободные слоты': {
+        displayName: 'Свободные временные слоты',
+        color: '#4CAF50'
+    }
 };
 
 // === ТЕКСТОВЫЕ КОНСТАНТЫ ===
@@ -221,6 +261,41 @@ function initDOM() {
 }
 
 // ============================================
+//  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С УСЛУГАМИ
+// ============================================
+
+function getServiceById(id) {
+    return SERVICE_BY_ID[id] || null;
+}
+
+function getServiceByName(name) {
+    return SERVICE_BY_NAME[name] || null;
+}
+
+function getServiceIdByName(name) {
+    const service = getServiceByName(name);
+    return service ? service.id : null;
+}
+
+function getServiceNameById(id) {
+    const service = getServiceById(id);
+    return service ? service.name : null;
+}
+
+function getServiceDisplayNameById(id) {
+    const service = getServiceById(id);
+    return service ? service.displayName : null;
+}
+
+function getServiceColor(serviceType) {
+    let service = getServiceByName(serviceType);
+    if (!service) {
+        service = getServiceById(serviceType);
+    }
+    return service ? service.color : '#E0E0E0';
+}
+
+// ============================================
 //  ЗАГРУЗКА НАСТРОЕК
 // ============================================
 
@@ -230,8 +305,9 @@ function loadSettings() {
         if (saved) {
             const colors = JSON.parse(saved);
             SERVICE_KEYS.forEach(key => {
-                if (colors[key]) {
-                    SERVICES[key].color = colors[key];
+                const service = SERVICES[key];
+                if (colors[service.id]) {
+                    service.color = colors[service.id];
                 }
             });
             if (colors._ui) {
@@ -300,13 +376,14 @@ function updateAdminSliderUI() {
 
 function filterRecordsForUser(records) {
     const user = getCurrentUser();
-    const currentUserName = user ? user.name : null;
+    const currentUserId = user ? user.id : null;
     if (!records) return {};
     const result = {};
     for (const [dateKey, dayRecords] of Object.entries(records)) {
         const filtered = dayRecords.filter(record => {
-            if (record.serviceType === 'Выходной') {
-                return record.master === currentUserName;
+            // Если запись "Выходной" - показываем только если мастер = текущий пользователь
+            if (record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной') {
+                return record.masterId === currentUserId;
             }
             return true;
         });
@@ -352,11 +429,6 @@ function formatDateForLetter(dateStr) {
     return String(day).padStart(2, '0') + '.' + String(month).padStart(2, '0') + '.' + year;
 }
 
-function getServiceColor(serviceType) {
-    const service = SERVICES[serviceType];
-    return service ? service.color : '#E0E0E0';
-}
-
 function getUIColor(key) {
     const uiColor = UI_COLORS[key];
     return uiColor ? uiColor.color : '#E0E0E0';
@@ -382,8 +454,9 @@ function getCleanupDays() {
 
 function generateLetter(record, template) {
     let text = template;
-    const service = SERVICES[record.serviceType];
-    const fullServiceName = service ? service.displayName : record.serviceType;
+    const serviceId = record.serviceTypeId;
+    const service = serviceId ? getServiceById(serviceId) : null;
+    const fullServiceName = service ? service.displayName : (record.serviceTypeName || record.serviceType || '');
     const masterPhone = getMasterPhoneByName(record.master || '');
     const vars = {
         '{{Имя клиента}}': record.clientName || 'Клиент',
@@ -424,17 +497,19 @@ async function loadMastersList() {
         const snapshot = await usersRef.once('value');
         const users = snapshot.val() || {};
         const masters = [];
-        for (const key in users) {
-            if (users[key].role === 'master' || users[key].role === 'admin') {
+        for (const [id, user] of Object.entries(users)) {
+            if (user.role === 'master' || user.role === 'admin') {
                 masters.push({
-                    name: users[key].name,
-                    phone: users[key].phone || ''
+                    id: id,
+                    name: user.name,
+                    phone: user.phone || ''
                 });
             }
         }
         const currentUser = getCurrentUser();
         if (masters.length === 0 && currentUser && currentUser.name) {
             masters.push({
+                id: currentUser.id,
                 name: currentUser.name,
                 phone: currentUser.phone || ''
             });
@@ -447,6 +522,7 @@ async function loadMastersList() {
                 option.value = m.name;
                 option.textContent = m.name + (m.phone ? ' (' + m.phone + ')' : '');
                 option.dataset.phone = m.phone || '';
+                option.dataset.userId = m.id;
                 modalMasterName.appendChild(option);
             });
         }
@@ -551,24 +627,37 @@ async function loadRecords() {
     }
 }
 
-async function saveRecord(date, startHour, endHour, serviceType, clientName, clientPhone, note, openLetter) {
-    if (serviceType === 'Выходной') {
+async function saveRecord(date, startHour, endHour, serviceTypeName, clientName, clientPhone, note, openLetter) {
+    if (serviceTypeName === 'Выходной') {
         clientName = '';
         clientPhone = '';
     }
     
+    const serviceTypeId = getServiceIdByName(serviceTypeName);
+    
     const user = getCurrentUser();
-    const masterName = modalMasterName ? modalMasterName.value : (user ? user.name : 'Мастер');
+    const masterSelect = modalMasterName;
+    const masterName = masterSelect ? masterSelect.value : (user ? user.name : 'Мастер');
+    
+    let masterId = user ? user.id : 'unknown';
+    if (masterSelect) {
+        const selectedOption = masterSelect.options[masterSelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.userId) {
+            masterId = selectedOption.dataset.userId;
+        }
+    }
     
     const record = {
         date,
         startHour: parseInt(startHour),
         endHour: parseInt(endHour),
-        serviceType,
+        serviceTypeId: serviceTypeId,
+        serviceTypeName: serviceTypeName,
         clientName: clientName || '',
         clientPhone: clientPhone || '',
         note: note || '',
         master: masterName,
+        masterId: masterId,
         userId: user ? user.id : 'unknown',
         createdAt: firebase.database.ServerValue.TIMESTAMP
     };
@@ -579,8 +668,8 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
             await firebaseSync.updateRecord(editingRecordId, date, record);
             const allData = await firebaseSync.loadAllRecords();
             recordsData = filterRecordsForUser(allData);
-            addNotification('✏️ Обновлена запись: ' + serviceType + ' на ' + date + ' ' + startHour + ':00');
-            sendSystemNotification('Запись обновлена', serviceType + ' на ' + date + ' ' + startHour + ':00');
+            addNotification('✏️ Обновлена запись: ' + serviceTypeName + ' на ' + date + ' ' + startHour + ':00');
+            sendSystemNotification('Запись обновлена', serviceTypeName + ' на ' + date + ' ' + startHour + ':00');
             renderCalendar();
             refreshDetail();
             closeModal();
@@ -598,15 +687,15 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
         const id = await firebaseSync.addRecord(record);
         record.id = id;
         scheduleReminder(record);
-        addNotification('📝 Добавлена запись: ' + serviceType + ' на ' + date + ' ' + startHour + ':00');
-        sendSystemNotification('Новая запись', serviceType + ' на ' + date + ' ' + startHour + ':00');
+        addNotification('📝 Добавлена запись: ' + serviceTypeName + ' на ' + date + ' ' + startHour + ':00');
+        sendSystemNotification('Новая запись', serviceTypeName + ' на ' + date + ' ' + startHour + ':00');
         const allData = await firebaseSync.loadAllRecords();
         recordsData = filterRecordsForUser(allData);
         renderCalendar();
         refreshDetail();
         closeModal();
         showToast(TEXTS.messages.recordSaved);
-        if (openLetter && serviceType !== 'Выходной') {
+        if (openLetter && serviceTypeName !== 'Выходной') {
             setTimeout(() => openModalWithLetter(record), 300);
         }
     } catch (error) {
@@ -642,14 +731,7 @@ function refreshDetail() {
 
 function closeModal() {
     modalOverlay.style.display = 'none';
-    
-    // ✅ СБРАСЫВАЕМ СОСТОЯНИЕ (все блокируем)
-    // Передаем null, чтобы все заблокировать
-    updateModalState(null);
-    // но для новой записи мы хотим, чтобы все было открыто,
-    // поэтому передаем специальный флаг
-    modalOverlay.dataset.isEditable = 'false';
-    
+    resetModalState();
     editingRecordId = null;
     currentModalTab = 'main';
     switchTab('main');
@@ -658,6 +740,74 @@ function closeModal() {
 function openModalWithLetter(record) {
     currentModalTab = 'letter';
     openModal(parseInt(record.date.split('-')[2]), parseInt(record.date.split('-')[1]), parseInt(record.date.split('-')[0]), null, record.id);
+}
+
+// ============================================
+//  УПРАВЛЕНИЕ СОСТОЯНИЕМ МОДАЛКИ
+// ============================================
+
+function updateModalState(record) {
+    let isEditable = false;
+    let showLetters = false;
+    let showDelete = false;
+    
+    if (record) {
+        const user = getCurrentUser();
+        const currentUserId = user ? user.id : null;
+        const isOwn = currentUserId && record.masterId === currentUserId;
+        const isAdmin = isAdminMode();
+        const isReadOnly = record._readOnly || false;
+        
+        isEditable = (isOwn || isAdmin) && !isReadOnly;
+        showLetters = isEditable && record.serviceTypeName !== 'Выходной' && record.serviceType !== 'Выходной';
+        showDelete = isEditable;
+    } else {
+        isEditable = true;
+        showLetters = true;
+        showDelete = false;
+    }
+    
+    modalService.disabled = !isEditable;
+    modalStartHour.disabled = !isEditable;
+    modalEndHour.disabled = !isEditable;
+    modalClientName.disabled = !isEditable;
+    modalClientPhone.disabled = !isEditable;
+    modalNote.disabled = !isEditable;
+    modalMasterName.disabled = !isEditable;
+    
+    if (showLetters) {
+        modalTabLetter.style.pointerEvents = 'auto';
+        modalTabLetter.style.opacity = '1';
+    } else {
+        modalTabLetter.style.pointerEvents = 'none';
+        modalTabLetter.style.opacity = '0.5';
+    }
+    
+    modalSave.style.display = isEditable ? 'block' : 'none';
+    modalDeleteTopBtn.style.display = showDelete ? 'block' : 'none';
+    
+    modalOverlay.dataset.isEditable = isEditable ? 'true' : 'false';
+}
+
+function resetModalState() {
+    modalService.disabled = true;
+    modalStartHour.disabled = true;
+    modalEndHour.disabled = true;
+    modalClientName.disabled = true;
+    modalClientPhone.disabled = true;
+    modalNote.disabled = true;
+    modalMasterName.disabled = true;
+    
+    modalTabLetter.style.pointerEvents = 'none';
+    modalTabLetter.style.opacity = '0.5';
+    
+    modalSave.style.display = 'none';
+    modalDeleteTopBtn.style.display = 'none';
+    
+    delete modalOverlay.dataset.deleteId;
+    delete modalOverlay.dataset.deleteDate;
+    delete modalOverlay.dataset.deleteService;
+    modalOverlay.dataset.isEditable = 'false';
 }
 
 // ============================================
@@ -812,7 +962,6 @@ function drawTile(canvas, day, isPast) {
     const radius = size/2 - 6, innerRadius = radius * INNER_RADIUS_RATIO;
     ctx.clearRect(0, 0, size, size);
     
-    // Внешний круг
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI*2);
     ctx.fillStyle = isPast ? '#F0F0F0' : '#FFFDF9';
@@ -838,28 +987,27 @@ function drawTile(canvas, day, isPast) {
     }
     
     const user = getCurrentUser();
-    const currentUserName = user ? user.name : null;
+    const currentUserId = user ? user.id : null;
     
-    // Создаем массив занятости по часам с recordId
     const hourState = [];
     for (let i = 0; i < 12; i++) {
         const hour = 9 + i;
-        let isBooked = false, color = getUIColor('Чужие записи'), serviceType = '', isOwn = false;
+        let isBooked = false, color = getUIColor('Чужие записи'), serviceTypeName = '', isOwn = false;
         let recordId = null;
         for (const r of dayRecords) {
             if (hour >= r.startHour && hour < r.endHour) {
                 isBooked = true;
-                serviceType = r.serviceType;
-                isOwn = currentUserName && r.master === currentUserName;
-                color = isOwn ? getServiceColor(serviceType) : getUIColor('Чужие записи');
-                recordId = r.id; // ✅ ЗАПОМИНАЕМ ID ЗАПИСИ
+                const serviceName = r.serviceTypeName || r.serviceType || '';
+                isOwn = currentUserId && r.masterId === currentUserId;
+                color = isOwn ? getServiceColor(serviceName) : getUIColor('Чужие записи');
+                serviceTypeName = serviceName;
+                recordId = r.id;
                 break;
             }
         }
-        hourState.push({ hour, isBooked, color, serviceType, isOwn, recordId });
+        hourState.push({ hour, isBooked, color, serviceTypeName, isOwn, recordId });
     }
     
-    // Рисуем секторы
     for (let i = 0; i < 12; i++) {
         const hour = 9 + i;
         const angleStart = Math.PI + i * (Math.PI*2 / 12);
@@ -868,7 +1016,7 @@ function drawTile(canvas, day, isPast) {
         const isBooked = state.isBooked;
         const color = state.color;
         const isOwn = state.isOwn;
-        const shouldBeGray = isBooked && filterType !== 'all' && state.serviceType !== filterType;
+        const shouldBeGray = isBooked && filterType !== 'all' && state.serviceTypeName !== filterType;
         const isFree = !isBooked && isFreeMode;
         
         let drawLeftBorder = false;
@@ -876,11 +1024,9 @@ function drawTile(canvas, day, isPast) {
         
         if (isBooked) {
             const prevState = i > 0 ? hourState[i - 1] : null;
-            // ✅ СРАВНИВАЕМ ПО ID ЗАПИСИ
             const isPrevSameRecord = prevState && 
                                      prevState.isBooked && 
                                      prevState.recordId === state.recordId;
-            
             const nextState = i < 11 ? hourState[i + 1] : null;
             const isNextSameRecord = nextState && 
                                      nextState.isBooked && 
@@ -904,21 +1050,18 @@ function drawTile(canvas, day, isPast) {
             const strokeColor = isOwn ? color : getUIColor('Чужие записи');
             const actualColor = shouldBeGray ? getUIColor('Чужие записи') : strokeColor;
             
-            // Внешняя граница
             ctx.beginPath();
             ctx.arc(cx, cy, radius, angleStart, angleEnd);
             ctx.strokeStyle = actualColor;
             ctx.lineWidth = 2.5;
             ctx.stroke();
             
-            // Внутренняя граница
             ctx.beginPath();
             ctx.arc(cx, cy, innerRadius, angleStart, angleEnd);
             ctx.strokeStyle = actualColor;
             ctx.lineWidth = 2.5;
             ctx.stroke();
             
-            // Левая граница: БЕЛАЯ если первый сектор записи
             if (drawLeftBorder) {
                 ctx.beginPath();
                 ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
@@ -928,7 +1071,6 @@ function drawTile(canvas, day, isPast) {
                 ctx.stroke();
             }
             
-            // Правая граница: БЕЛАЯ если последний сектор записи
             if (drawRightBorder) {
                 ctx.beginPath();
                 ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
@@ -953,7 +1095,6 @@ function drawTile(canvas, day, isPast) {
         }
     }
     
-    // Внутренний круг
     ctx.beginPath();
     ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
     ctx.fillStyle = '#FFFFFF';
@@ -962,7 +1103,6 @@ function drawTile(canvas, day, isPast) {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     
-    // Цифра дня
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = isPast ? '#A0A0A0' : '#37474F';
@@ -1017,35 +1157,6 @@ function initFilters() {
 //  МОДАЛКА ЗАПИСИ
 // ============================================
 
-function resetModalState() {
-    // Блокируем все поля
-    modalService.disabled = true;
-    modalStartHour.disabled = true;
-    modalEndHour.disabled = true;
-    modalClientName.disabled = true;
-    modalClientPhone.disabled = true;
-    modalNote.disabled = true;
-    modalMasterName.disabled = true;
-    
-    // Скрываем вкладку писем
-    modalTabLetter.style.pointerEvents = 'none';
-    modalTabLetter.style.opacity = '0.5';
-    
-    // Скрываем кнопки
-    modalSave.style.display = 'none';
-    modalDeleteTopBtn.style.display = 'none';
-    
-    // Очищаем дата-атрибуты
-    delete modalOverlay.dataset.deleteId;
-    delete modalOverlay.dataset.deleteDate;
-    delete modalOverlay.dataset.deleteService;
-    modalOverlay.dataset.isEditable = 'false';
-    
-    editingRecordId = null;
-    currentModalTab = 'main';
-    switchTab('main');
-}
-
 function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     if (!modalOverlay) return;
     
@@ -1057,11 +1168,10 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     let record = null;
     let isDayOff = false;
     
-    // 1. ЕСЛИ СУЩЕСТВУЕТ ЗАПИСЬ - ПОЛУЧАЕМ ЕЕ ДАННЫЕ
     if (recordId) {
         const dayRecords = recordsData[dateKey] || [];
         record = dayRecords.find(r => String(r.id) === String(recordId));
-        if (record && record.serviceType === 'Выходной') {
+        if (record && (record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной')) {
             isDayOff = true;
         }
         if (record) {
@@ -1069,14 +1179,11 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         }
     }
     
-    // 2. ЗАГРУЖАЕМ СПИСОК МАСТЕРОВ (ВСЕГДА)
     loadMastersList();
     
-    // 3. ЗАПОЛНЯЕМ ЗАГОЛОВКИ
     modalTitle.textContent = isNew ? TEXTS.titles.newRecord : (readOnly ? TEXTS.titles.viewRecord : TEXTS.titles.editRecord);
     modalDate.textContent = formatModalDate(dateKey);
     
-    // 4. ФУНКЦИЯ ДЛЯ ПОЛЕЙ КЛИЕНТА
     function toggleClientFields(serviceType) {
         const isDayOffField = serviceType === 'Выходной';
         const nameGroup = modalClientName.closest('.form-group');
@@ -1092,33 +1199,37 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         }
     }
     
-    // 5. ЗАПОЛНЯЕМ ПОЛЯ
     if (recordId && record) {
-        // ✅ СУЩЕСТВУЮЩАЯ ЗАПИСЬ - ЗАПОЛНЯЕМ ИЗ БАЗЫ
-        modalService.value = record.serviceType || '';
+        let serviceName = record.serviceTypeName || record.serviceType || '';
+        if (record.serviceTypeId) {
+            const service = getServiceById(record.serviceTypeId);
+            if (service) {
+                serviceName = service.name;
+            }
+        }
+        
+        modalService.value = serviceName || SERVICE_KEYS[0];
         modalStartHour.value = record.startHour || '';
         modalEndHour.value = record.endHour || '';
         modalClientName.value = record.clientName || '';
         modalClientPhone.value = record.clientPhone || '';
         modalNote.value = record.note || '';
-        modalMasterName.value = record.master || ''; // ✅ ПРОСТО СТАВИМ ИЗ ЗАПИСИ
+        modalMasterName.value = record.master || '';
         
         modalOverlay.dataset.deleteId = String(record.id);
         modalOverlay.dataset.deleteDate = record.date;
-        modalOverlay.dataset.deleteService = record.serviceType;
+        modalOverlay.dataset.deleteService = record.serviceTypeName || record.serviceType || '';
         
-        if (record.serviceType !== 'Выходной') {
+        if (record.serviceTypeName !== 'Выходной' && record.serviceType !== 'Выходной') {
             renderLetterTemplates(record);
         } else {
             modalLetterContainer.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">' + TEXTS.titles.noTemplatesAvailable + '</p>';
         }
-        toggleClientFields(record.serviceType);
+        toggleClientFields(record.serviceTypeName || record.serviceType || '');
         updateEndHourOptions(parseInt(modalStartHour.value));
-        
         updateModalState(record);
         
     } else {
-        // ✅ НОВАЯ ЗАПИСЬ - УСТАНАВЛИВАЕМ ЗНАЧЕНИЯ ПО УМОЛЧАНИЮ
         modalService.value = SERVICE_KEYS[0];
         modalStartHour.value = selectedRange ? selectedRange.start : 9;
         modalEndHour.value = selectedRange ? selectedRange.end : 10;
@@ -1129,7 +1240,6 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         toggleClientFields(SERVICE_KEYS[0]);
         updateEndHourOptions(selectedRange ? selectedRange.start : 9);
         
-        // ✅ ДЛЯ НОВОЙ ЗАПИСИ - ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ КАК МАСТЕР
         const user = getCurrentUser();
         if (user && user.name && modalMasterName) {
             modalMasterName.value = user.name;
@@ -1141,61 +1251,6 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     modalLoading.style.display = 'none';
     modalOverlay.style.display = 'flex';
     modalOverlay.dataset.date = dateKey;
-}
-
-// ============================================
-//  УПРАВЛЕНИЕ СОСТОЯНИЕМ МОДАЛКИ
-// ============================================
-
-function updateModalState(record) {
-    // По умолчанию - все заблокировано
-    let isEditable = false;
-    let showLetters = false;
-    let showDelete = false;
-    
-    // Если запись существует
-    if (record) {
-        const user = getCurrentUser();
-        const currentUserName = user ? user.name : null;
-        const isOwn = currentUserName && record.master === currentUserName;
-        const isAdmin = isAdminMode();
-        const isReadOnly = record._readOnly || false;
-        
-        // Можно редактировать если: своя запись ИЛИ админ, И НЕ readOnly
-        isEditable = (isOwn || isAdmin) && !isReadOnly;
-        showLetters = isEditable && record.serviceType !== 'Выходной';
-        showDelete = isEditable;
-    } else {
-        // Новая запись - все открыто
-        isEditable = true;
-        showLetters = true;
-        showDelete = false; // У новой записи нет кнопки удаления
-    }
-    
-    // Применяем состояние к полям
-    modalService.disabled = !isEditable;
-    modalStartHour.disabled = !isEditable;
-    modalEndHour.disabled = !isEditable;
-    modalClientName.disabled = !isEditable;
-    modalClientPhone.disabled = !isEditable;
-    modalNote.disabled = !isEditable;
-    modalMasterName.disabled = !isEditable;
-    
-    // Вкладка писем
-    if (showLetters) {
-        modalTabLetter.style.pointerEvents = 'auto';
-        modalTabLetter.style.opacity = '1';
-    } else {
-        modalTabLetter.style.pointerEvents = 'none';
-        modalTabLetter.style.opacity = '0.5';
-    }
-    
-    // Кнопки
-    modalSave.style.display = isEditable ? 'block' : 'none';
-    modalDeleteTopBtn.style.display = showDelete ? 'block' : 'none';
-    
-    // Сохраняем состояние для дальнейшего использования
-    modalOverlay.dataset.isEditable = isEditable ? 'true' : 'false';
 }
 
 function updateEndHourOptions(startHour) {
@@ -1312,7 +1367,9 @@ function initModal() {
     });
     
     modalOverlay.addEventListener('click', function(e) {
-        if (e.target === e.currentTarget) closeModal();
+        if (e.target === e.currentTarget) {
+            closeModal();
+        }
     });
     
     modalSave.addEventListener('click', function(e) {
@@ -1357,9 +1414,10 @@ function initModal() {
     
     modalService.innerHTML = '';
     SERVICE_KEYS.forEach(key => {
+        const service = SERVICES[key];
         const option = document.createElement('option');
-        option.value = key;
-        option.textContent = SERVICES[key].displayName;
+        option.value = service.name;
+        option.textContent = service.displayName;
         modalService.appendChild(option);
     });
     
@@ -1460,31 +1518,23 @@ function switchSettingsTab(tab) {
     const contentColors = document.getElementById('settingsTabColorsContent');
     
     if (tab === 'general') {
-        if (tabGeneral) {
-            tabGeneral.className = 'settings-tab active';
-            tabGeneral.style.color = '#008080';
-            tabGeneral.style.borderBottomColor = '#008080';
-        }
-        if (tabColors) {
-            tabColors.className = 'settings-tab';
-            tabColors.style.color = '#7B8D8E';
-            tabColors.style.borderBottomColor = 'transparent';
-        }
-        if (contentGeneral) contentGeneral.style.display = 'block';
-        if (contentColors) contentColors.style.display = 'none';
+        tabGeneral.className = 'settings-tab active';
+        tabGeneral.style.color = '#008080';
+        tabGeneral.style.borderBottomColor = '#008080';
+        tabColors.className = 'settings-tab';
+        tabColors.style.color = '#7B8D8E';
+        tabColors.style.borderBottomColor = 'transparent';
+        contentGeneral.style.display = 'block';
+        contentColors.style.display = 'none';
     } else {
-        if (tabGeneral) {
-            tabGeneral.className = 'settings-tab';
-            tabGeneral.style.color = '#7B8D8E';
-            tabGeneral.style.borderBottomColor = 'transparent';
-        }
-        if (tabColors) {
-            tabColors.className = 'settings-tab active';
-            tabColors.style.color = '#008080';
-            tabColors.style.borderBottomColor = '#008080';
-        }
-        if (contentGeneral) contentGeneral.style.display = 'none';
-        if (contentColors) contentColors.style.display = 'block';
+        tabGeneral.className = 'settings-tab';
+        tabGeneral.style.color = '#7B8D8E';
+        tabGeneral.style.borderBottomColor = 'transparent';
+        tabColors.className = 'settings-tab active';
+        tabColors.style.color = '#008080';
+        tabColors.style.borderBottomColor = '#008080';
+        contentGeneral.style.display = 'none';
+        contentColors.style.display = 'block';
     }
 }
 
@@ -1497,7 +1547,7 @@ function renderSettingsColors() {
         html += `
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
                 <label style="flex:1;font-size:13px;font-weight:500;">${service.displayName}</label>
-                <input type="color" value="${service.color}" data-category="service" data-key="${key}" style="width:44px;height:36px;border:none;padding:0;cursor:pointer;border-radius:6px;">
+                <input type="color" value="${service.color}" data-service-id="${service.id}" style="width:44px;height:36px;border:none;padding:0;cursor:pointer;border-radius:6px;">
             </div>
         `;
     });
@@ -1518,8 +1568,12 @@ function renderSettingsColors() {
 }
 
 function saveAllColors() {
-    document.querySelectorAll('#settingsColorsContainer input[data-category="service"]').forEach(inp => {
-        SERVICES[inp.dataset.key].color = inp.value;
+    document.querySelectorAll('#settingsColorsContainer input[data-service-id]').forEach(inp => {
+        const serviceId = inp.dataset.serviceId;
+        const service = getServiceById(serviceId);
+        if (service) {
+            service.color = inp.value;
+        }
     });
     
     document.querySelectorAll('#settingsUIColorsContainer input[data-category="ui"]').forEach(inp => {
@@ -1528,7 +1582,8 @@ function saveAllColors() {
     
     const colors = {};
     SERVICE_KEYS.forEach(key => {
-        colors[key] = SERVICES[key].color;
+        const service = SERVICES[key];
+        colors[service.id] = service.color;
     });
     colors._ui = {};
     Object.entries(UI_COLORS).forEach(([key, data]) => {
@@ -1705,15 +1760,19 @@ function renderStats() {
     const fromDate = new Date(from), toDate = new Date(to);
     toDate.setHours(23,59,59,999);
     const stats = {};
-    SERVICE_KEYS.forEach(key => { stats[key] = 0; });
+    SERVICE_KEYS.forEach(key => {
+        const service = SERVICES[key];
+        stats[service.name] = 0;
+    });
     let total = 0;
     
     for (const [dateKey, records] of Object.entries(recordsData)) {
         const d = new Date(dateKey);
         if (d >= fromDate && d <= toDate) {
             records.forEach(r => {
-                if (stats[r.serviceType] !== undefined) {
-                    stats[r.serviceType]++;
+                const serviceName = r.serviceTypeName || r.serviceType || '';
+                if (stats[serviceName] !== undefined) {
+                    stats[serviceName]++;
                     total++;
                 }
             });
@@ -1724,11 +1783,11 @@ function renderStats() {
     
     const maxCount = Math.max(...Object.values(stats));
     let html = '<div style="margin-bottom:12px;text-align:center;font-size:14px;color:#37474F;">Всего записей: <strong>' + total + '</strong></div>';
-    for (const [service, count] of Object.entries(stats)) {
-        if (service === 'Выходной') continue;
+    for (const [serviceName, count] of Object.entries(stats)) {
+        if (serviceName === 'Выходной') continue;
         const percent = maxCount > 0 ? (count / maxCount * 100) : 0;
-        const color = getServiceColor(service);
-        html += '<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:3px;"><span>' + service + '</span><span>' + count + '</span></div>' +
+        const color = getServiceColor(serviceName);
+        html += '<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:3px;"><span>' + serviceName + '</span><span>' + count + '</span></div>' +
             '<div style="height:24px;background:#F0F0F0;border-radius:12px;overflow:hidden;"><div style="height:100%;width:' + percent + '%;background:' + color + ';border-radius:12px;transition:width 0.5s ease;"></div></div></div>';
     }
     statsContent.innerHTML = html;
@@ -1834,7 +1893,7 @@ const Detail = {
         ];
         carouselTrack.innerHTML = '';
         const user = getCurrentUser();
-        const currentUserName = user ? user.name : null;
+        const currentUserId = user ? user.id : null;
         
         months.forEach(({m, y}) => {
             for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) {
@@ -1857,7 +1916,6 @@ const Detail = {
                 const radius = size/2 - 6, innerRadius = radius * INNER_RADIUS_RATIO;
                 ctx.clearRect(0, 0, size, size);
                 
-                // Внешний круг
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI*2);
                 ctx.fillStyle = isPast ? '#F5F5F5' : '#FFFDF9';
@@ -1872,7 +1930,6 @@ const Detail = {
                     dayRecords = Object.values(dayRecords);
                 }
                 
-                // Создаем массив занятости с recordId
                 const hourState = [];
                 for (let i = 0; i < 12; i++) {
                     const hour = 9 + i;
@@ -1881,8 +1938,9 @@ const Detail = {
                     for (const r of dayRecords) {
                         if (hour >= r.startHour && hour < r.endHour) {
                             isBooked = true;
-                            isOwn = currentUserName && r.master === currentUserName;
-                            color = isOwn ? getServiceColor(r.serviceType) : getUIColor('Чужие записи');
+                            isOwn = currentUserId && r.masterId === currentUserId;
+                            const serviceName = r.serviceTypeName || r.serviceType || '';
+                            color = isOwn ? getServiceColor(serviceName) : getUIColor('Чужие записи');
                             recordId = r.id;
                             break;
                         }
@@ -1890,7 +1948,6 @@ const Detail = {
                     hourState.push({ hour, isBooked, color, isOwn, recordId });
                 }
                 
-                // Рисуем секторы
                 for (let i = 0; i < 12; i++) {
                     const hour = 9 + i;
                     const angleStart = Math.PI + i * (Math.PI*2 / 12);
@@ -1906,12 +1963,12 @@ const Detail = {
                     if (isBooked) {
                         const prevState = i > 0 ? hourState[i - 1] : null;
                         const isPrevSameRecord = prevState && 
-                                                prevState.isBooked && 
-                                                prevState.recordId === state.recordId;
+                                                 prevState.isBooked && 
+                                                 prevState.recordId === state.recordId;
                         const nextState = i < 11 ? hourState[i + 1] : null;
                         const isNextSameRecord = nextState && 
-                                                nextState.isBooked && 
-                                                nextState.recordId === state.recordId;
+                                                 nextState.isBooked && 
+                                                 nextState.recordId === state.recordId;
                         
                         drawLeftBorder = !isPrevSameRecord;
                         drawRightBorder = !isNextSameRecord;
@@ -1932,7 +1989,6 @@ const Detail = {
                         ctx.lineWidth = 1.5;
                         ctx.stroke();
                         
-                        // Левая граница: БЕЛАЯ если первый сектор записи
                         if (drawLeftBorder) {
                             ctx.beginPath();
                             ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
@@ -1942,7 +1998,6 @@ const Detail = {
                             ctx.stroke();
                         }
                         
-                        // Правая граница: БЕЛАЯ если последний сектор записи
                         if (drawRightBorder) {
                             ctx.beginPath();
                             ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
@@ -1960,7 +2015,6 @@ const Detail = {
                     }
                 }
                 
-                // Внутренний круг
                 ctx.beginPath();
                 ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
                 ctx.fillStyle = '#FFFFFF';
@@ -1969,7 +2023,6 @@ const Detail = {
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
                 
-                // Цифра дня
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = isPast ? '#A0A0A0' : '#37474F';
@@ -2014,29 +2067,27 @@ const Detail = {
             dayRecords = Object.values(dayRecords);
         }
         const user = getCurrentUser();
-        const currentUserName = user ? user.name : null;
+        const currentUserId = user ? user.id : null;
         const isPast = isDayPast(year, month, day);
         
-        // Создаем массив занятости с recordId
         const hourState = [];
         for (let i = 0; i < 12; i++) {
             const hour = 9 + i;
-            let isBooked = false, color = getUIColor('Чужие записи'), serviceType = '', isOwn = false;
+            let isBooked = false, color = getUIColor('Чужие записи'), serviceTypeName = '', isOwn = false;
             let recordId = null;
             for (const r of dayRecords) {
                 if (hour >= r.startHour && hour < r.endHour) {
                     isBooked = true;
-                    serviceType = r.serviceType;
-                    isOwn = currentUserName && r.master === currentUserName;
-                    color = isOwn ? getServiceColor(serviceType) : getUIColor('Чужие записи');
+                    serviceTypeName = r.serviceTypeName || r.serviceType || '';
+                    isOwn = currentUserId && r.masterId === currentUserId;
+                    color = isOwn ? getServiceColor(serviceTypeName) : getUIColor('Чужие записи');
                     recordId = r.id;
                     break;
                 }
             }
-            hourState.push({ hour, isBooked, color, serviceType, isOwn, recordId });
+            hourState.push({ hour, isBooked, color, serviceTypeName, isOwn, recordId });
         }
         
-        // Рисуем секторы
         for (let i = 0; i < 12; i++) {
             const hour = 9 + i;
             const angleStart = Math.PI + i * (Math.PI*2 / 12);
@@ -2053,12 +2104,12 @@ const Detail = {
             if (isBooked) {
                 const prevState = i > 0 ? hourState[i - 1] : null;
                 const isPrevSameRecord = prevState && 
-                                        prevState.isBooked && 
-                                        prevState.recordId === state.recordId;
+                                         prevState.isBooked && 
+                                         prevState.recordId === state.recordId;
                 const nextState = i < 11 ? hourState[i + 1] : null;
                 const isNextSameRecord = nextState && 
-                                        nextState.isBooked && 
-                                        nextState.recordId === state.recordId;
+                                         nextState.isBooked && 
+                                         nextState.recordId === state.recordId;
                 
                 drawLeftBorder = !isPrevSameRecord;
                 drawRightBorder = !isNextSameRecord;
@@ -2079,7 +2130,6 @@ const Detail = {
                 ctx.lineWidth = isHighlighted ? 4 : 2.5;
                 ctx.stroke();
                 
-                // Левая граница: БЕЛАЯ если первый сектор записи
                 if (drawLeftBorder) {
                     ctx.beginPath();
                     ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
@@ -2089,7 +2139,6 @@ const Detail = {
                     ctx.stroke();
                 }
                 
-                // Правая граница: БЕЛАЯ если последний сектор записи
                 if (drawRightBorder) {
                     ctx.beginPath();
                     ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
@@ -2114,7 +2163,6 @@ const Detail = {
             }
         }
         
-        // Внутренний круг
         ctx.beginPath();
         ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
         ctx.fillStyle = '#FFFFFF';
@@ -2123,7 +2171,6 @@ const Detail = {
         ctx.lineWidth = 1;
         ctx.stroke();
         
-        // Часы
         const labelRadius = radius + 28;
         for (let i = 0; i < 12; i++) {
             const hour = 9 + i;
@@ -2147,7 +2194,7 @@ const Detail = {
             dayRecords = Object.values(dayRecords);
         }
         const user = getCurrentUser();
-        const currentUserName = user ? user.name : null;
+        const currentUserId = user ? user.id : null;
         if (!detailRecordsList) return;
         detailRecordsList.innerHTML = '';
         if (dayRecords.length === 0) {
@@ -2156,11 +2203,12 @@ const Detail = {
         }
         dayRecords.sort((a,b) => a.startHour - b.startHour);
         dayRecords.forEach(record => {
-            const isOwn = currentUserName && record.master === currentUserName;
+            const isOwn = currentUserId && record.masterId === currentUserId;
             const isAdmin = isAdminMode();
             const canEdit = isOwn || isAdmin;
             
-            const color = canEdit ? getServiceColor(record.serviceType) : getUIColor('Чужие записи');
+            const serviceName = record.serviceTypeName || record.serviceType || '';
+            const color = canEdit ? getServiceColor(serviceName) : getUIColor('Чужие записи');
             const borderColor = canEdit ? color : getUIColor('Чужие записи');
             const bgColor = canEdit ? color + '30' : getUIColor('Чужие записи') + '20';
             const li = document.createElement('li');
@@ -2168,8 +2216,8 @@ const Detail = {
             const start = String(record.startHour).padStart(2,'0') + ':00';
             const end = String(record.endHour).padStart(2,'0') + ':00';
             let info = '<strong>' + start + ' — ' + end + '</strong>';
-            info += ' <span style="color:' + (canEdit ? '#008080' : '#7B8D8E') + ';font-weight:500;margin-left:6px;">' + record.serviceType + '</span>';
-            if (canEdit && record.serviceType !== 'Выходной') {
+            info += ' <span style="color:' + (canEdit ? '#008080' : '#7B8D8E') + ';font-weight:500;margin-left:6px;">' + serviceName + '</span>';
+            if (canEdit && serviceName !== 'Выходной') {
                 if (record.clientName) info += ' <span style="margin-left:8px;font-size:12px;color:#37474F;">' + record.clientName + '</span>';
                 if (record.clientPhone) info += ' <span style="margin-left:8px;font-size:12px;color:#7B8D8E;">' + record.clientPhone + '</span>';
             }
@@ -2380,11 +2428,11 @@ function initDetailCanvas() {
         
         const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(Detail.currentDay || 1);
         const user = getCurrentUser();
-        const currentUserName = user ? user.name : null;
+        const currentUserId = user ? user.id : null;
         
         const existingRecord = getRecordAtHour(dateKey, hour);
         if (existingRecord) {
-            const isOwn = currentUserName && existingRecord.master === currentUserName;
+            const isOwn = currentUserId && existingRecord.masterId === currentUserId;
             const isAdmin = isAdminMode();
             const canEdit = isOwn || isAdmin;
             
@@ -2685,7 +2733,7 @@ function initWindowsEditor() {
         const lines = [];
         const showWeekends = windowsState.showWeekends;
         const currentUser = getCurrentUser();
-        const currentUserName = currentUser ? currentUser.name : null;
+        const currentUserId = currentUser ? currentUser.id : null;
         
         for (let d = 1; d <= days; d++) {
             const date = new Date(year, month - 1, d);
@@ -2713,7 +2761,7 @@ function initWindowsEditor() {
             
             for (let r = 0; r < dayRecords.length; r++) {
                 const record = dayRecords[r];
-                if (record.serviceType === 'Выходной' && record.master !== currentUserName) {
+                if ((record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной') && record.masterId !== currentUserId) {
                     continue;
                 }
                 for (let t = 0; t < TIMES.length; t++) {
@@ -2722,7 +2770,7 @@ function initWindowsEditor() {
                         hour = 18;
                     }
                     if (hour >= record.startHour && hour < record.endHour) {
-                        if (record.serviceType === 'Выходной') {
+                        if (record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной') {
                             weekendSlots.add(TIMES[t]);
                         } else {
                             booked.add(TIMES[t]);

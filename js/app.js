@@ -1049,16 +1049,15 @@ function resetModalState() {
 function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     if (!modalOverlay) return;
     
-    loadMastersList();
-    
     editingRecordId = recordId || null;
     const dateKey = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
     const isNew = !recordId;
     const readOnly = isReadOnly || false;
     
-    let isDayOff = false;
     let record = null;
+    let isDayOff = false;
     
+    // 1. ЕСЛИ СУЩЕСТВУЕТ ЗАПИСЬ - ПОЛУЧАЕМ ЕЕ ДАННЫЕ
     if (recordId) {
         const dayRecords = recordsData[dateKey] || [];
         record = dayRecords.find(r => String(r.id) === String(recordId));
@@ -1070,9 +1069,14 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         }
     }
     
+    // 2. ЗАГРУЖАЕМ СПИСОК МАСТЕРОВ (ВСЕГДА)
+    loadMastersList();
+    
+    // 3. ЗАПОЛНЯЕМ ЗАГОЛОВКИ
     modalTitle.textContent = isNew ? TEXTS.titles.newRecord : (readOnly ? TEXTS.titles.viewRecord : TEXTS.titles.editRecord);
     modalDate.textContent = formatModalDate(dateKey);
     
+    // 4. ФУНКЦИЯ ДЛЯ ПОЛЕЙ КЛИЕНТА
     function toggleClientFields(serviceType) {
         const isDayOffField = serviceType === 'Выходной';
         const nameGroup = modalClientName.closest('.form-group');
@@ -1088,15 +1092,16 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         }
     }
     
+    // 5. ЗАПОЛНЯЕМ ПОЛЯ
     if (recordId && record) {
-        // Заполняем поля из записи
+        // ✅ СУЩЕСТВУЮЩАЯ ЗАПИСЬ - ЗАПОЛНЯЕМ ИЗ БАЗЫ
         modalService.value = record.serviceType || '';
         modalStartHour.value = record.startHour || '';
         modalEndHour.value = record.endHour || '';
         modalClientName.value = record.clientName || '';
         modalClientPhone.value = record.clientPhone || '';
         modalNote.value = record.note || '';
-        modalMasterName.value = record.master || ''; // ✅ УСТАНАВЛИВАЕМ ИЗ ЗАПИСИ
+        modalMasterName.value = record.master || ''; // ✅ ПРОСТО СТАВИМ ИЗ ЗАПИСИ
         
         modalOverlay.dataset.deleteId = String(record.id);
         modalOverlay.dataset.deleteDate = record.date;
@@ -1110,11 +1115,10 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         toggleClientFields(record.serviceType);
         updateEndHourOptions(parseInt(modalStartHour.value));
         
-        // Управление состоянием
         updateModalState(record);
         
     } else {
-        // Новая запись
+        // ✅ НОВАЯ ЗАПИСЬ - УСТАНАВЛИВАЕМ ЗНАЧЕНИЯ ПО УМОЛЧАНИЮ
         modalService.value = SERVICE_KEYS[0];
         modalStartHour.value = selectedRange ? selectedRange.start : 9;
         modalEndHour.value = selectedRange ? selectedRange.end : 10;
@@ -1125,13 +1129,12 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         toggleClientFields(SERVICE_KEYS[0]);
         updateEndHourOptions(selectedRange ? selectedRange.start : 9);
         
-        // ✅ ДЛЯ НОВОЙ ЗАПИСИ - УСТАНАВЛИВАЕМ ТЕКУЩЕГО ПОЛЬЗОВАТЕЛЯ
+        // ✅ ДЛЯ НОВОЙ ЗАПИСИ - ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ КАК МАСТЕР
         const user = getCurrentUser();
         if (user && user.name && modalMasterName) {
             modalMasterName.value = user.name;
         }
         
-        // Управление состоянием (новая запись)
         updateModalState(null);
     }
     

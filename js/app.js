@@ -651,8 +651,17 @@ function refreshDetail() {
 
 function closeModal() {
     modalOverlay.style.display = 'none';
+    
+    // ✅ СБРАСЫВАЕМ СОСТОЯНИЕ (все блокируем)
+    // Передаем null, чтобы все заблокировать
+    updateModalState(null);
+    // но для новой записи мы хотим, чтобы все было открыто,
+    // поэтому передаем специальный флаг
+    modalOverlay.dataset.isEditable = 'false';
+    
     editingRecordId = null;
     currentModalTab = 'main';
+    switchTab('main');
 }
 
 function openModalWithLetter(record) {
@@ -812,7 +821,7 @@ function drawTile(canvas, day, isPast) {
     const radius = size/2 - 6, innerRadius = radius * INNER_RADIUS_RATIO;
     ctx.clearRect(0, 0, size, size);
     
-    // 1. Внешний круг (фон)
+    // Внешний круг
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI*2);
     ctx.fillStyle = isPast ? '#F0F0F0' : '#FFFDF9';
@@ -840,11 +849,10 @@ function drawTile(canvas, day, isPast) {
     const user = getCurrentUser();
     const currentUserName = user ? user.name : null;
     
-    // 2. РИСУЕМ СЕКТОРЫ
+    // Создаем массив занятости по часам
+    const hourState = [];
     for (let i = 0; i < 12; i++) {
         const hour = 9 + i;
-        const angleStart = Math.PI + i * (Math.PI*2 / 12);
-        const angleEnd = Math.PI + (i + 1) * (Math.PI*2 / 12);
         let isBooked = false, color = getUIColor('Чужие записи'), serviceType = '', isOwn = false;
         for (const r of dayRecords) {
             if (hour >= r.startHour && hour < r.endHour) {
@@ -855,8 +863,40 @@ function drawTile(canvas, day, isPast) {
                 break;
             }
         }
-        const shouldBeGray = isBooked && filterType !== 'all' && serviceType !== filterType;
+        hourState.push({ hour, isBooked, color, serviceType, isOwn });
+    }
+    
+    // Рисуем секторы
+    for (let i = 0; i < 12; i++) {
+        const hour = 9 + i;
+        const angleStart = Math.PI + i * (Math.PI*2 / 12);
+        const angleEnd = Math.PI + (i + 1) * (Math.PI*2 / 12);
+        const state = hourState[i];
+        const isBooked = state.isBooked;
+        const color = state.color;
+        const isOwn = state.isOwn;
+        const shouldBeGray = isBooked && filterType !== 'all' && state.serviceType !== filterType;
         const isFree = !isBooked && isFreeMode;
+        
+        // Определяем, нужно ли рисовать границы
+        let drawLeftBorder = false;
+        let drawRightBorder = false;
+        
+        if (isBooked) {
+            // Проверяем предыдущий час
+            const prevState = i > 0 ? hourState[i - 1] : null;
+            const isPrevBooked = prevState && prevState.isBooked && prevState.serviceType === state.serviceType && prevState.isOwn === state.isOwn;
+            
+            // Проверяем следующий час
+            const nextState = i < 11 ? hourState[i + 1] : null;
+            const isNextBooked = nextState && nextState.isBooked && nextState.serviceType === state.serviceType && nextState.isOwn === state.isOwn;
+            
+            // Левый край: если предыдущий не занят той же записью ИЛИ это первый сектор
+            drawLeftBorder = !isPrevBooked;
+            
+            // Правый край: если следующий не занят той же записью ИЛИ это последний сектор
+            drawRightBorder = !isNextBooked;
+        }
         
         ctx.beginPath();
         ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
@@ -865,13 +905,53 @@ function drawTile(canvas, day, isPast) {
         ctx.closePath();
         
         if (isBooked) {
+            // Заливка
             const fillColor = isOwn ? color : getUIColor('Чужие записи');
-            const strokeColor = isOwn ? color : getUIColor('Чужие записи');
             ctx.fillStyle = shouldBeGray ? getUIColor('Чужие записи') : fillColor;
             ctx.fill();
-            ctx.strokeStyle = shouldBeGray ? getUIColor('Чужие записи') : strokeColor;
+            
+            // Границы
+            const strokeColor = isOwn ? color : getUIColor('Чужие записи');
+            const actualColor = shouldBeGray ? getUIColor('Чужие записи') : strokeColor;
+            
+            // Внешняя граница (снаружи)
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, angleStart, angleEnd);
+            ctx.strokeStyle = actualColor;
             ctx.lineWidth = 2.5;
             ctx.stroke();
+            
+            // Внутренняя граница
+            ctx.beginPath();
+            ctx.arc(cx, cy, innerRadius, angleStart, angleEnd);
+            ctx.strokeStyle = actualColor;
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            
+            // Левая граница (радиус) - белая если не нужно рисовать левый край
+            ctx.beginPath();
+            ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
+            ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
+            if (drawLeftBorder) {
+                ctx.strokeStyle = actualColor;
+            } else {
+                ctx.strokeStyle = '#FFFFFF';
+            }
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            
+            // Правая граница (радиус) - белая если не нужно рисовать правый край
+            ctx.beginPath();
+            ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
+            ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
+            if (drawRightBorder) {
+                ctx.strokeStyle = actualColor;
+            } else {
+                ctx.strokeStyle = '#FFFFFF';
+            }
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            
         } else if (isFree && !isPast) {
             ctx.fillStyle = getUIColor('Свободные слоты');
             ctx.fill();
@@ -887,7 +967,7 @@ function drawTile(canvas, day, isPast) {
         }
     }
     
-    // 3. ВНУТРЕННИЙ КРУГ ПОВЕРХ СЕКТОРОВ (ВСЕГДА БЕЛЫЙ)
+    // Внутренний круг поверх секторов
     ctx.beginPath();
     ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
     ctx.fillStyle = '#FFFFFF';
@@ -896,7 +976,7 @@ function drawTile(canvas, day, isPast) {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     
-    // 4. ЦИФРА ДНЯ ПОВЕРХ БЕЛОГО КРУГА
+    // Цифра дня
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = isPast ? '#A0A0A0' : '#37474F';
@@ -951,6 +1031,35 @@ function initFilters() {
 //  МОДАЛКА ЗАПИСИ
 // ============================================
 
+function resetModalState() {
+    // Блокируем все поля
+    modalService.disabled = true;
+    modalStartHour.disabled = true;
+    modalEndHour.disabled = true;
+    modalClientName.disabled = true;
+    modalClientPhone.disabled = true;
+    modalNote.disabled = true;
+    modalMasterName.disabled = true;
+    
+    // Скрываем вкладку писем
+    modalTabLetter.style.pointerEvents = 'none';
+    modalTabLetter.style.opacity = '0.5';
+    
+    // Скрываем кнопки
+    modalSave.style.display = 'none';
+    modalDeleteTopBtn.style.display = 'none';
+    
+    // Очищаем дата-атрибуты
+    delete modalOverlay.dataset.deleteId;
+    delete modalOverlay.dataset.deleteDate;
+    delete modalOverlay.dataset.deleteService;
+    modalOverlay.dataset.isEditable = 'false';
+    
+    editingRecordId = null;
+    currentModalTab = 'main';
+    switchTab('main');
+}
+
 function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     if (!modalOverlay) return;
     
@@ -962,19 +1071,19 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     const readOnly = isReadOnly || false;
     
     let isDayOff = false;
+    let record = null;
+    
     if (recordId) {
         const dayRecords = recordsData[dateKey] || [];
-        const record = dayRecords.find(r => String(r.id) === String(recordId));
+        record = dayRecords.find(r => String(r.id) === String(recordId));
         if (record && record.serviceType === 'Выходной') {
             isDayOff = true;
         }
+        // Передаем флаг readOnly в запись
+        if (record) {
+            record._readOnly = readOnly;
+        }
     }
-    
-    modalTabLetter.style.pointerEvents = (isNew || isDayOff || readOnly) ? 'none' : 'auto';
-    modalTabLetter.style.opacity = (isNew || isDayOff || readOnly) ? '0.5' : '1';
-    
-    if (isNew) { currentModalTab = 'main'; switchTab('main'); }
-    else { switchTab(currentModalTab); }
     
     modalTitle.textContent = isNew ? TEXTS.titles.newRecord : (readOnly ? TEXTS.titles.viewRecord : TEXTS.titles.editRecord);
     modalDate.textContent = formatModalDate(dateKey);
@@ -994,60 +1103,33 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         }
     }
     
-    if (recordId) {
-        const dayRecords = recordsData[dateKey] || [];
-        const record = dayRecords.find(r => String(r.id) === String(recordId));
-        if (record) {
-            modalService.value = record.serviceType || '';
-            modalStartHour.value = record.startHour || '';
-            modalEndHour.value = record.endHour || '';
-            modalClientName.value = record.clientName || '';
-            modalClientPhone.value = record.clientPhone || '';
-            modalNote.value = record.note || '';
-            modalMasterName.value = record.master || '';
-            
-            modalOverlay.dataset.deleteId = String(record.id);
-            modalOverlay.dataset.deleteDate = record.date;
-            modalOverlay.dataset.deleteService = record.serviceType;
-            
-            if (record.serviceType !== 'Выходной' && !readOnly) {
-                renderLetterTemplates(record);
-            } else {
-                modalLetterContainer.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">' + TEXTS.titles.noTemplatesAvailable + '</p>';
-            }
-            toggleClientFields(record.serviceType);
-            
-            modalService.disabled = readOnly;
-            modalStartHour.disabled = readOnly;
-            modalEndHour.disabled = readOnly;
-            modalClientName.disabled = readOnly;
-            modalClientPhone.disabled = readOnly;
-            modalNote.disabled = readOnly;
-            modalMasterName.disabled = readOnly;
-            
-            modalSave.style.display = readOnly ? 'none' : 'block';
-            modalDeleteTopBtn.style.display = readOnly ? 'none' : 'block';
-            
-            updateEndHourOptions(parseInt(modalStartHour.value));
+    if (recordId && record) {
+        // Заполняем поля из записи
+        modalService.value = record.serviceType || '';
+        modalStartHour.value = record.startHour || '';
+        modalEndHour.value = record.endHour || '';
+        modalClientName.value = record.clientName || '';
+        modalClientPhone.value = record.clientPhone || '';
+        modalNote.value = record.note || '';
+        modalMasterName.value = record.master || '';
+        
+        modalOverlay.dataset.deleteId = String(record.id);
+        modalOverlay.dataset.deleteDate = record.date;
+        modalOverlay.dataset.deleteService = record.serviceType;
+        
+        if (record.serviceType !== 'Выходной') {
+            renderLetterTemplates(record);
         } else {
-            editingRecordId = null;
-            modalService.value = SERVICE_KEYS[0];
-            modalStartHour.value = 9;
-            modalEndHour.value = 10;
-            modalClientName.value = '';
-            modalClientPhone.value = '';
-            modalNote.value = '';
-            modalLetterContainer.innerHTML = '';
-            toggleClientFields(SERVICE_KEYS[0]);
-            modalTitle.textContent = TEXTS.titles.newRecord;
-            updateEndHourOptions(9);
-            
-            const user = getCurrentUser();
-            if (user && user.name && modalMasterName) {
-                modalMasterName.value = user.name;
-            }
+            modalLetterContainer.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">' + TEXTS.titles.noTemplatesAvailable + '</p>';
         }
+        toggleClientFields(record.serviceType);
+        updateEndHourOptions(parseInt(modalStartHour.value));
+        
+        // ✅ ВЫЗЫВАЕМ ФУНКЦИЮ УПРАВЛЕНИЯ СОСТОЯНИЕМ
+        updateModalState(record);
+        
     } else {
+        // Новая запись
         modalService.value = SERVICE_KEYS[0];
         modalStartHour.value = selectedRange ? selectedRange.start : 9;
         modalEndHour.value = selectedRange ? selectedRange.end : 10;
@@ -1058,6 +1140,9 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         toggleClientFields(SERVICE_KEYS[0]);
         updateEndHourOptions(selectedRange ? selectedRange.start : 9);
         
+        // ✅ ВЫЗЫВАЕМ ФУНКЦИЮ УПРАВЛЕНИЯ СОСТОЯНИЕМ (новая запись)
+        updateModalState(null);
+        
         const user = getCurrentUser();
         if (user && user.name && modalMasterName) {
             modalMasterName.value = user.name;
@@ -1065,9 +1150,63 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     }
     
     modalLoading.style.display = 'none';
-    modalSave.disabled = readOnly;
     modalOverlay.style.display = 'flex';
     modalOverlay.dataset.date = dateKey;
+}
+
+// ============================================
+//  УПРАВЛЕНИЕ СОСТОЯНИЕМ МОДАЛКИ
+// ============================================
+
+function updateModalState(record) {
+    // По умолчанию - все заблокировано
+    let isEditable = false;
+    let showLetters = false;
+    let showDelete = false;
+    
+    // Если запись существует
+    if (record) {
+        const user = getCurrentUser();
+        const currentUserName = user ? user.name : null;
+        const isOwn = currentUserName && record.master === currentUserName;
+        const isAdmin = isAdminMode();
+        const isReadOnly = record._readOnly || false;
+        
+        // Можно редактировать если: своя запись ИЛИ админ, И НЕ readOnly
+        isEditable = (isOwn || isAdmin) && !isReadOnly;
+        showLetters = isEditable && record.serviceType !== 'Выходной';
+        showDelete = isEditable;
+    } else {
+        // Новая запись - все открыто
+        isEditable = true;
+        showLetters = true;
+        showDelete = false; // У новой записи нет кнопки удаления
+    }
+    
+    // Применяем состояние к полям
+    modalService.disabled = !isEditable;
+    modalStartHour.disabled = !isEditable;
+    modalEndHour.disabled = !isEditable;
+    modalClientName.disabled = !isEditable;
+    modalClientPhone.disabled = !isEditable;
+    modalNote.disabled = !isEditable;
+    modalMasterName.disabled = !isEditable;
+    
+    // Вкладка писем
+    if (showLetters) {
+        modalTabLetter.style.pointerEvents = 'auto';
+        modalTabLetter.style.opacity = '1';
+    } else {
+        modalTabLetter.style.pointerEvents = 'none';
+        modalTabLetter.style.opacity = '0.5';
+    }
+    
+    // Кнопки
+    modalSave.style.display = isEditable ? 'block' : 'none';
+    modalDeleteTopBtn.style.display = showDelete ? 'block' : 'none';
+    
+    // Сохраняем состояние для дальнейшего использования
+    modalOverlay.dataset.isEditable = isEditable ? 'true' : 'false';
 }
 
 function updateEndHourOptions(startHour) {
@@ -1817,11 +1956,9 @@ const Detail = {
         if (!detailCanvas) return;
         const ctx = detailCanvas.getContext('2d');
         const size = detailCanvas.width, cx = size/2, cy = size/2;
-        const radius = size/2 - 20;
-        const innerRadius = radius * INNER_RADIUS_RATIO;
+        const radius = size/2 - 20, innerRadius = radius * INNER_RADIUS_RATIO;
         ctx.clearRect(0, 0, size, size);
         
-        // 1. Внешний круг
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI*2);
         ctx.fillStyle = '#FFFDF9';
@@ -1839,11 +1976,10 @@ const Detail = {
         const currentUserName = user ? user.name : null;
         const isPast = isDayPast(year, month, day);
         
-        // 2. РИСУЕМ СЕКТОРЫ
+        // Создаем массив занятости по часам
+        const hourState = [];
         for (let i = 0; i < 12; i++) {
             const hour = 9 + i;
-            const angleStart = Math.PI + i * (Math.PI*2 / 12);
-            const angleEnd = Math.PI + (i + 1) * (Math.PI*2 / 12);
             let isBooked = false, color = getUIColor('Чужие записи'), serviceType = '', isOwn = false;
             for (const r of dayRecords) {
                 if (hour >= r.startHour && hour < r.endHour) {
@@ -1854,20 +1990,77 @@ const Detail = {
                     break;
                 }
             }
+            hourState.push({ hour, isBooked, color, serviceType, isOwn });
+        }
+        
+        // Рисуем секторы
+        for (let i = 0; i < 12; i++) {
+            const hour = 9 + i;
+            const angleStart = Math.PI + i * (Math.PI*2 / 12);
+            const angleEnd = Math.PI + (i + 1) * (Math.PI*2 / 12);
+            const state = hourState[i];
+            const isBooked = state.isBooked;
+            const color = state.color;
+            const isOwn = state.isOwn;
             const isHighlighted = highlightHours.indexOf(hour) !== -1;
+            
+            let drawLeftBorder = false;
+            let drawRightBorder = false;
+            
+            if (isBooked) {
+                const prevState = i > 0 ? hourState[i - 1] : null;
+                const isPrevBooked = prevState && prevState.isBooked && prevState.serviceType === state.serviceType && prevState.isOwn === state.isOwn;
+                const nextState = i < 11 ? hourState[i + 1] : null;
+                const isNextBooked = nextState && nextState.isBooked && nextState.serviceType === state.serviceType && nextState.isOwn === state.isOwn;
+                
+                drawLeftBorder = !isPrevBooked;
+                drawRightBorder = !isNextBooked;
+            }
+            
             ctx.beginPath();
             ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
             ctx.arc(cx, cy, radius, angleStart, angleEnd);
             ctx.arc(cx, cy, innerRadius, angleEnd, angleStart);
             ctx.closePath();
+            
             if (isBooked) {
                 const fillColor = isOwn ? color : getUIColor('Чужие записи');
-                const strokeColor = isOwn ? color : getUIColor('Чужие записи');
                 ctx.fillStyle = isPast ? color : fillColor;
                 ctx.fill();
-                ctx.strokeStyle = isHighlighted ? '#008080' : (isPast ? color : strokeColor);
+                
+                const strokeColor = isOwn ? color : getUIColor('Чужие записи');
+                const actualColor = strokeColor;
+                
+                // Внешняя граница
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, angleStart, angleEnd);
+                ctx.strokeStyle = isHighlighted ? '#008080' : actualColor;
                 ctx.lineWidth = isHighlighted ? 4 : 2.5;
                 ctx.stroke();
+                
+                // Внутренняя граница
+                ctx.beginPath();
+                ctx.arc(cx, cy, innerRadius, angleStart, angleEnd);
+                ctx.strokeStyle = isHighlighted ? '#008080' : actualColor;
+                ctx.lineWidth = isHighlighted ? 4 : 2.5;
+                ctx.stroke();
+                
+                // Левая граница
+                ctx.beginPath();
+                ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
+                ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
+                ctx.strokeStyle = drawLeftBorder ? actualColor : '#FFFFFF';
+                ctx.lineWidth = isHighlighted ? 4 : 2.5;
+                ctx.stroke();
+                
+                // Правая граница
+                ctx.beginPath();
+                ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
+                ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
+                ctx.strokeStyle = drawRightBorder ? actualColor : '#FFFFFF';
+                ctx.lineWidth = isHighlighted ? 4 : 2.5;
+                ctx.stroke();
+                
             } else if (isHighlighted) {
                 ctx.fillStyle = 'rgba(0,128,128,0.15)';
                 ctx.fill();
@@ -1883,7 +2076,7 @@ const Detail = {
             }
         }
         
-        // 3. ВНУТРЕННИЙ КРУГ ПОВЕРХ СЕКТОРОВ (ВСЕГДА БЕЛЫЙ)
+        // Внутренний круг
         ctx.beginPath();
         ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
         ctx.fillStyle = '#FFFFFF';
@@ -1892,7 +2085,7 @@ const Detail = {
         ctx.lineWidth = 1;
         ctx.stroke();
         
-        // 4. ЧАСЫ ВОКРУГ (оставляем как есть)
+        // Часы
         const labelRadius = radius + 28;
         for (let i = 0; i < 12; i++) {
             const hour = 9 + i;

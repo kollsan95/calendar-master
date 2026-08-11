@@ -3,27 +3,77 @@
 // ============================================
 
 // === КОНСТАНТЫ ===
-const DEFAULT_COLORS = {
-    'Кератин': '#D4AF37',
-    'Ботокс': '#4A90E2',
-    'Холодное': '#A8D8EA',
-    'Полировка': '#7B8D8E',
-    'Выходной': '#9E9E9E'
-};
-
-const SERVICE_NAMES = {
-    'Кератин': 'Кератиновое выпрямление',
-    'Ботокс': 'Ботокс для волос',
-    'Холодное': 'Холодное восстановление',
-    'Полировка': 'Полировка волос',
-    'Выходной': 'Выходной день'
-};
-
-const WORKING_HOURS = 12;
-const GRAY = '#E0E0E0';
 const INNER_RADIUS_RATIO = 0.5;
-const END_OF_DAY = 21;
 
+// === ПРОЦЕДУРЫ (единая структура) ===
+const SERVICES = {
+    'Кератин': { displayName: 'Кератиновое выпрямление', color: '#D4AF37' },
+    'Ботокс': { displayName: 'Ботокс для волос', color: '#4A90E2' },
+    'Холодное': { displayName: 'Холодное восстановление', color: '#A8D8EA' },
+    'Полировка': { displayName: 'Полировка волос', color: '#7B8D8E' },
+    'Выходной': { displayName: 'Выходной день', color: '#9E9E9E' }
+};
+
+const SERVICE_KEYS = Object.keys(SERVICES);
+
+// === СИСТЕМНЫЕ ЦВЕТА ===
+const UI_COLORS = {
+    'Чужие записи': { displayName: 'Записи других мастеров', color: '#E0E0E0' },
+    'Свободные слоты': { displayName: 'Свободные временные слоты', color: '#4CAF50' }
+};
+
+// === ТЕКСТОВЫЕ КОНСТАНТЫ ===
+const TEXTS = {
+    weekdays: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+    months: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
+             'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'],
+    windowsTimes: ['09:00', '12:00', '15:00', '18:00 (19:00)'],
+    titles: {
+        newRecord: '📝 Новая запись',
+        editRecord: '✏️ Редактирование записи',
+        viewRecord: '👁️ Просмотр записи',
+        noRecords: 'Нет записей',
+        loading: 'Загрузка...',
+        noTemplate: '📷 Нет шаблона',
+        editTemplate: 'Нажмите ✏️ для редактирования',
+        addBackground: 'и добавьте подложку',
+        noTemplatesAvailable: 'Шаблоны не доступны',
+        weekendsHint: 'С моими выходными',
+        saveTemplate: '💾 Сохранить',
+        resetTemplate: '↺ Сброс',
+        viewMode: '👁️ Просмотр',
+        editMode: '✏️ Редактирование'
+    },
+    messages: {
+        recordSaved: '✅ Запись сохранена!',
+        recordUpdated: '✅ Запись обновлена!',
+        recordDeleted: '🗑️ Запись удалена',
+        recordLoadError: '❌ Ошибка сохранения в облако',
+        deleteConfirm: 'Отменить запись?',
+        timeError: '❌ Время начала должно быть меньше окончания',
+        timeBusy: '⏰ Это время уже занято',
+        copySuccess: '✅ Текст скопирован!',
+        copyError: '❌ Не удалось скопировать',
+        noTextToCopy: '❌ Нет текста для копирования',
+        settingsSaved: '✅ Настройки сохранены!',
+        cleanupDone: '🧹 Очистка запущена!',
+        cleanupComplete: '✅ Очистка завершена',
+        templateSaved: '✅ Шаблон сохранен!',
+        templateReset: '↺ Шаблон сброшен',
+        noTemplateWarning: '⚠️ Сначала добавьте подложку',
+        bgAdded: '✅ Подложка добавлена',
+        bgLoadError: '⚠️ Ошибка загрузки подложки',
+        bgLoadFailed: '❌ Не удалось загрузить изображение',
+        fileReadError: '❌ Ошибка чтения файла',
+        imageReady: '✅ Изображение готово! Нажмите и удерживайте для сохранения',
+        adminOn: '👑 Режим администратора включен',
+        adminOff: '👑 Режим администратора выключен',
+        logoutConfirm: 'Вы уверены, что хотите выйти из аккаунта?',
+        logoutSuccess: '🚪 Выход выполнен'
+    }
+};
+
+// === ШАБЛОНЫ ПИСЕМ ===
 const DEFAULT_TEMPLATE = `{{Имя клиента}}, записала Вас:
 
 {{дата записи}} на {{время начала}}
@@ -39,6 +89,7 @@ const DEFAULT_TEMPLATE = `{{Имя клиента}}, записала Вас:
 const DEFAULT_CONFIRM_TEMPLATE = `{{Имя клиента}}, добрый день! Напоминаю о вашей записи. Жду вас {{дата записи}} в {{время начала}}. ПОДТВЕРЖДАЕТЕ ЗАПИСЬ?
 Если у вас возникли изменения в планах или вам нужно перенести запись, пожалуйста, свяжитесь с нами. С нетерпением ждем встречи!`;
 
+// === КЛЮЧИ ХРАНИЛИЩА ===
 const STORAGE_KEYS = {
     TEMPLATE_PREFIX: 'windowsTemplate_',
     CLEANUP_DAYS: 'cleanupDays',
@@ -47,7 +98,6 @@ const STORAGE_KEYS = {
 };
 
 // === ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ===
-let COLORS = loadSettings();
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth() + 1;
 let recordsData = {};
@@ -60,8 +110,8 @@ let startScrollPos = 0;
 let notifications = [];
 let unreadCount = 0;
 let editingRecordId = null;
-let templateText = loadTemplate('letterTemplate', DEFAULT_TEMPLATE);
-let confirmTemplateText = loadTemplate('confirmLetterTemplate', DEFAULT_CONFIRM_TEMPLATE);
+let templateText = DEFAULT_TEMPLATE;
+let confirmTemplateText = DEFAULT_CONFIRM_TEMPLATE;
 let currentModalTab = 'main';
 let editingTemplateType = 'new';
 let isAnimating = false;
@@ -71,21 +121,148 @@ let firebaseSync = null;
 let firebaseInitialized = false;
 
 // ============================================
-//  ПРОВЕРКА АВТОРИЗАЦИИ
+//  DOM ЭЛЕМЕНТЫ (ИНИЦИАЛИЗАЦИЯ ЧЕРЕЗ window)
 // ============================================
 
-function checkAuth() {
-    const isAuth = isUserAuthenticated();
-    const user = getCurrentUser();
-    if (!isAuth || !user) {
-        window.location.href = '/login.html';
-        return false;
-    }
-    return true;
+function initDOM() {
+    // Основные контейнеры
+    window.app = document.getElementById('app');
+    window.appHeader = document.getElementById('appHeader');
+    window.calendarContainer = document.getElementById('calendarContainer');
+    window.loader = document.getElementById('loader');
+    window.detailContainer = document.getElementById('detailContainer');
+    window.detailHeader = document.getElementById('detailHeader');
+    window.detailCanvas = document.getElementById('detailCanvas');
+    window.detailRecordsList = document.getElementById('detailRecordsList');
+    window.detailBackBtn = document.getElementById('detailBackBtn');
+    window.detailAddBtn = document.getElementById('detailAddBtn');
+    window.carouselTrack = document.getElementById('carouselTrack');
+    window.bottomPanel = document.getElementById('bottomPanel');
+    window.filtersContainer = document.getElementById('filtersContainer');
+    window.notifBadge = document.getElementById('notifBadge');
+    
+    // Модалка записи
+    window.modalOverlay = document.getElementById('modalOverlay');
+    window.modalCloseBtn = document.getElementById('modalCloseBtn');
+    window.modalDeleteTopBtn = document.getElementById('modalDeleteTopBtn');
+    window.modalTitle = document.getElementById('modalTitle');
+    window.modalDate = document.getElementById('modalDate');
+    window.modalTabMain = document.getElementById('modalTabMain');
+    window.modalTabLetter = document.getElementById('modalTabLetter');
+    window.modalMainContent = document.getElementById('modalMainContent');
+    window.modalLetterContent = document.getElementById('modalLetterContent');
+    window.modalLetterContainer = document.getElementById('modalLetterContainer');
+    window.modalService = document.getElementById('modalService');
+    window.modalStartHour = document.getElementById('modalStartHour');
+    window.modalEndHour = document.getElementById('modalEndHour');
+    window.modalClientName = document.getElementById('modalClientName');
+    window.modalClientPhone = document.getElementById('modalClientPhone');
+    window.modalMasterName = document.getElementById('modalMasterName');
+    window.modalNote = document.getElementById('modalNote');
+    window.modalSave = document.getElementById('modalSave');
+    window.modalLoading = document.getElementById('modalLoading');
+    
+    // Модалка настроек
+    window.settingsModal = document.getElementById('settingsModal');
+    window.settingsCloseBtn = document.getElementById('settingsCloseBtn');
+    window.settingsColorsContainer = document.getElementById('settingsColorsContainer');
+    window.settingsUIColorsContainer = document.getElementById('settingsUIColorsContainer');
+    window.settingsCleanupContainer = document.getElementById('settingsCleanupContainer');
+    window.settingsLogoutContainer = document.getElementById('settingsLogoutContainer');
+    window.settingsTemplateEdit = document.getElementById('settingsTemplateEdit');
+    window.settingsConfirmTemplateEdit = document.getElementById('settingsConfirmTemplateEdit');
+    window.settingsColorsSave = document.getElementById('settingsColorsSave');
+    
+    // Модалка редактора шаблона
+    window.templateEditorModal = document.getElementById('templateEditorModal');
+    window.templateEditorClose = document.getElementById('templateEditorClose');
+    window.templateEditorCancel = document.getElementById('templateEditorCancel');
+    window.templateEditorSave = document.getElementById('templateEditorSave');
+    window.templateEditorTitle = document.getElementById('templateEditorTitle');
+    window.templateEditorText = document.getElementById('templateEditorText');
+    
+    // Модалка статистики
+    window.statsModal = document.getElementById('statsModal');
+    window.statsCloseBtn = document.getElementById('statsCloseBtn');
+    window.statsDateFrom = document.getElementById('statsDateFrom');
+    window.statsDateTo = document.getElementById('statsDateTo');
+    window.statsContent = document.getElementById('statsContent');
+    
+    // Модалка уведомлений
+    window.notificationsModal = document.getElementById('notificationsModal');
+    window.notificationsCloseBtn = document.getElementById('notificationsCloseBtn');
+    window.notificationsList = document.getElementById('notificationsList');
+    
+    // Кнопки
+    window.settingsBtn = document.getElementById('settingsBtn');
+    window.statsBtn = document.getElementById('statsBtn');
+    window.notificationsBtn = document.getElementById('notificationsBtn');
+    window.windowsBtn = document.getElementById('windowsBtn');
+    
+    // Страница окошек
+    window.windowsPage = document.getElementById('windowsPage');
+    window.windowsPageCloseBtn = document.getElementById('windowsPageCloseBtn');
+    window.windowsPageEditBtn = document.getElementById('windowsPageEditBtn');
+    window.windowsPageViewBtn = document.getElementById('windowsPageViewBtn');
+    window.windowsPageSaveBtn = document.getElementById('windowsPageSaveBtn');
+    window.windowsPageResetBtn = document.getElementById('windowsPageResetBtn');
+    window.windowsPageAddBgBtn = document.getElementById('windowsPageAddBgBtn');
+    window.windowsPageFileInput = document.getElementById('windowsPageFileInput');
+    window.windowsPageCanvas = document.getElementById('windowsPageCanvas');
+    window.windowsPagePreview = document.getElementById('windowsPagePreview');
+    window.windowsPageHint = document.getElementById('windowsPageHint');
+    window.windowsPageSpinner = document.getElementById('windowsPageSpinner');
+    window.windowsPageBadge = document.getElementById('windowsPageBadge');
+    window.windowsPageFooterText = document.getElementById('windowsPageFooterText');
+    window.windowsPageContainer = document.getElementById('windowsPageContainer');
+    window.windowsShowWeekends = document.getElementById('windowsShowWeekends');
+    
+    console.log('✅ DOM элементы инициализированы');
 }
 
 // ============================================
-//  НАСТРОЙКА АДМИН
+//  ЗАГРУЗКА НАСТРОЕК
+// ============================================
+
+function loadSettings() {
+    try {
+        const saved = localStorage.getItem('serviceColors');
+        if (saved) {
+            const colors = JSON.parse(saved);
+            SERVICE_KEYS.forEach(key => {
+                if (colors[key]) {
+                    SERVICES[key].color = colors[key];
+                }
+            });
+            if (colors._ui) {
+                Object.entries(colors._ui).forEach(([key, color]) => {
+                    if (UI_COLORS[key]) {
+                        UI_COLORS[key].color = color;
+                    }
+                });
+            }
+        }
+    } catch {}
+}
+
+function saveSettings(colors) {
+    localStorage.setItem('serviceColors', JSON.stringify(colors));
+}
+
+function loadTemplate(key, defaultText) {
+    try {
+        return localStorage.getItem(key) || defaultText;
+    } catch { return defaultText; }
+}
+
+function saveTemplate(key, text) {
+    localStorage.setItem(key, text);
+    if (key === 'letterTemplate') templateText = text;
+    if (key === 'confirmLetterTemplate') confirmTemplateText = text;
+}
+
+// ============================================
+//  АДМИН РЕЖИМ
 // ============================================
 
 function isAdminMode() {
@@ -103,20 +280,138 @@ function toggleAdminMode() {
     const newValue = !isAdminMode();
     setAdminMode(newValue);
     updateAdminSliderUI();
-    showToast(newValue ? '👑 Режим администратора включен' : '👑 Режим администратора выключен');
+    showToast(newValue ? TEXTS.messages.adminOn : TEXTS.messages.adminOff);
 }
 
 function updateAdminSliderUI() {
     const checkbox = document.getElementById('settingsAdminMode');
     const slider = document.getElementById('adminSlider');
     const dot = document.getElementById('adminSliderDot');
-    
     if (!checkbox || !slider || !dot) return;
-    
     const isEnabled = isAdminMode();
     checkbox.checked = isEnabled;
     slider.style.background = isEnabled ? '#008080' : '#ccc';
     dot.style.transform = isEnabled ? 'translateX(22px)' : 'translateX(0)';
+}
+
+// ============================================
+//  ФИЛЬТРАЦИЯ ЗАПИСЕЙ
+// ============================================
+
+function filterRecordsForUser(records) {
+    const user = getCurrentUser();
+    const currentUserName = user ? user.name : null;
+    if (!records) return {};
+    const result = {};
+    for (const [dateKey, dayRecords] of Object.entries(records)) {
+        const filtered = dayRecords.filter(record => {
+            if (record.serviceType === 'Выходной') {
+                return record.master === currentUserName;
+            }
+            return true;
+        });
+        if (filtered.length > 0) {
+            result[dateKey] = filtered;
+        }
+    }
+    return result;
+}
+
+// ============================================
+//  УТИЛИТЫ
+// ============================================
+
+function isDayPast(year, month, day) {
+    const now = new Date();
+    const date = new Date(year, month - 1, day);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (date < today) return true;
+    if (date.getTime() === today.getTime()) return now.getHours() >= 21;
+    return false;
+}
+
+function getMonthName(month) {
+    return (TEXTS.months[month - 1] || '').toLowerCase();
+}
+
+function getMonthTitle(month) {
+    return TEXTS.months[month - 1] || '';
+}
+
+function getDayName(dateStr) {
+    return TEXTS.weekdays[new Date(dateStr).getDay()] || '';
+}
+
+function formatModalDate(dateStr) {
+    const [year, month, day] = dateStr.split('-');
+    return getDayName(dateStr) + ', ' + parseInt(day) + ' ' + getMonthName(parseInt(month));
+}
+
+function formatDateForLetter(dateStr) {
+    const [year, month, day] = dateStr.split('-');
+    return String(day).padStart(2, '0') + '.' + String(month).padStart(2, '0') + '.' + year;
+}
+
+function getServiceColor(serviceType) {
+    const service = SERVICES[serviceType];
+    return service ? service.color : '#E0E0E0';
+}
+
+function getUIColor(key) {
+    const uiColor = UI_COLORS[key];
+    return uiColor ? uiColor.color : '#E0E0E0';
+}
+
+function getMasterPhoneByName(name) {
+    if (!modalMasterName) return '';
+    const option = Array.from(modalMasterName.options).find(o => o.value === name);
+    return option ? option.dataset.phone || '' : '';
+}
+
+function getMonthKey() {
+    const now = new Date();
+    return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+}
+
+function getCleanupDays() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.CLEANUP_DAYS);
+        return saved ? parseInt(saved) : 90;
+    } catch { return 90; }
+}
+
+function generateLetter(record, template) {
+    let text = template;
+    const service = SERVICES[record.serviceType];
+    const fullServiceName = service ? service.displayName : record.serviceType;
+    const masterPhone = getMasterPhoneByName(record.master || '');
+    const vars = {
+        '{{Имя клиента}}': record.clientName || 'Клиент',
+        '{{дата записи}}': formatDateForLetter(record.date),
+        '{{время начала}}': String(record.startHour).padStart(2, '0') + ':00',
+        '{{Телефон клиента}}': record.clientPhone || '',
+        '{{Процедура}}': fullServiceName,
+        '{{Мастер}}': record.master || 'Мастер',
+        '{{Телефон мастера}}': masterPhone
+    };
+    for (const [key, val] of Object.entries(vars)) {
+        text = text.replace(new RegExp(key, 'g'), val);
+    }
+    return text;
+}
+
+// ============================================
+//  ПРОВЕРКА АВТОРИЗАЦИИ
+// ============================================
+
+function checkAuth() {
+    const isAuth = isUserAuthenticated();
+    const user = getCurrentUser();
+    if (!isAuth || !user) {
+        window.location.href = '/login.html';
+        return false;
+    }
+    return true;
 }
 
 // ============================================
@@ -144,25 +439,24 @@ async function loadMastersList() {
                 phone: currentUser.phone || ''
             });
         }
-        const select = document.getElementById('modalMasterName');
-        if (select) {
-            select.innerHTML = '';
+        if (modalMasterName) {
+            modalMasterName.innerHTML = '';
             masters.forEach(m => {
                 const option = document.createElement('option');
                 option.value = m.name;
                 option.textContent = m.name + (m.phone ? ' (' + m.phone + ')' : '');
                 option.dataset.phone = m.phone || '';
-                select.appendChild(option);
+                modalMasterName.appendChild(option);
             });
             if (currentUser && currentUser.name) {
-                const found = Array.from(select.options).find(o => o.value === currentUser.name);
+                const found = Array.from(modalMasterName.options).find(o => o.value === currentUser.name);
                 if (found) {
-                    select.value = currentUser.name;
+                    modalMasterName.value = currentUser.name;
                 } else if (masters.length > 0) {
-                    select.value = masters[0].name;
+                    modalMasterName.value = masters[0].name;
                 }
             } else if (masters.length > 0) {
-                select.value = masters[0].name;
+                modalMasterName.value = masters[0].name;
             }
         }
         return masters;
@@ -172,133 +466,11 @@ async function loadMastersList() {
     }
 }
 
-function getMasterPhoneByName(name) {
-    const select = document.getElementById('modalMasterName');
-    if (!select) return '';
-    const option = Array.from(select.options).find(o => o.value === name);
-    return option ? option.dataset.phone || '' : '';
-}
-
-// ============================================
-//  ЗАГРУЗКА ДАННЫХ
-// ============================================
-
-function loadSettings() {
-    try {
-        const saved = localStorage.getItem('serviceColors');
-        return saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_COLORS));
-    } catch { return JSON.parse(JSON.stringify(DEFAULT_COLORS)); }
-}
-
-function saveSettings(colors) {
-    localStorage.setItem('serviceColors', JSON.stringify(colors));
-}
-
-function loadTemplate(key, defaultText) {
-    try {
-        return localStorage.getItem(key) || defaultText;
-    } catch { return defaultText; }
-}
-
-function saveTemplate(key, text) {
-    localStorage.setItem(key, text);
-    if (key === 'letterTemplate') templateText = text;
-    if (key === 'confirmLetterTemplate') confirmTemplateText = text;
-}
-
-// ============================================
-//  ФИЛЬТРАЦИЯ ЗАПИСЕЙ
-// ============================================
-
-function filterRecordsForUser(records) {
-    const user = getCurrentUser();
-    const currentUserName = user ? user.name : null;
-    
-    if (!records) return {};
-    
-    const result = {};
-    for (const [dateKey, dayRecords] of Object.entries(records)) {
-        const filtered = dayRecords.filter(record => {
-            // Если запись "Выходной" - показываем только если мастер = текущий пользователь
-            if (record.serviceType === 'Выходной') {
-                return record.master === currentUserName;
-            }
-            // Обычные записи показываем всем
-            return true;
-        });
-        if (filtered.length > 0) {
-            result[dateKey] = filtered;
-        }
-    }
-    return result;
-}
-
-// === УТИЛИТЫ ===
-function isDayPast(year, month, day) {
-    const now = new Date();
-    const date = new Date(year, month - 1, day);
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (date < today) return true;
-    if (date.getTime() === today.getTime()) return now.getHours() >= END_OF_DAY;
-    return false;
-}
-
-function getMonthName(month) {
-    return ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 
-            'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'][month - 1];
-}
-
-function getDayName(dateStr) {
-    return ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][new Date(dateStr).getDay()];
-}
-
-function formatModalDate(dateStr) {
-    const [year, month, day] = dateStr.split('-');
-    return getDayName(dateStr) + ', ' + parseInt(day) + ' ' + getMonthName(parseInt(month));
-}
-
-function formatDateForLetter(dateStr) {
-    const [year, month, day] = dateStr.split('-');
-    return String(day).padStart(2, '0') + '.' + String(month).padStart(2, '0') + '.' + year;
-}
-
-function generateLetter(record, template) {
-    let text = template;
-    const fullServiceName = SERVICE_NAMES[record.serviceType] || record.serviceType;
-    const masterPhone = getMasterPhoneByName(record.master || '');
-    const vars = {
-        '{{Имя клиента}}': record.clientName || 'Клиент',
-        '{{дата записи}}': formatDateForLetter(record.date),
-        '{{время начала}}': String(record.startHour).padStart(2, '0') + ':00',
-        '{{Телефон клиента}}': record.clientPhone || '',
-        '{{Процедура}}': fullServiceName,
-        '{{Мастер}}': record.master || 'Мастер',
-        '{{Телефон мастера}}': masterPhone
-    };
-    for (const [key, val] of Object.entries(vars)) {
-        text = text.replace(new RegExp(key, 'g'), val);
-    }
-    return text;
-}
-
-function getMonthKey() {
-    const now = new Date();
-    return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-}
-
-function getCleanupDays() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEYS.CLEANUP_DAYS);
-        return saved ? parseInt(saved) : 90;
-    } catch { return 90; }
-}
-
 // ============================================
 //  ИНИЦИАЛИЗАЦИЯ FIREBASE
 // ============================================
 
 async function initFirebase() {
-    const loader = document.getElementById('loader');
     if (loader) loader.style.display = 'none';
     
     try {
@@ -328,6 +500,9 @@ async function initFirebase() {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
+    initDOM();
+    loadSettings();
+    
     if (!checkAuth()) return;
     console.log('🚀 Приложение загружено');
     updateFilterColors();
@@ -352,7 +527,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================
 
 async function loadRecords() {
-    const loader = document.getElementById('loader');
     if (loader) loader.style.display = 'none';
     
     if (!firebaseInitialized) {
@@ -366,10 +540,9 @@ async function loadRecords() {
     try {
         if (firebaseSync) {
             firebaseSync.syncRecords((data) => {
-                // ✅ ПРИМЕНЯЕМ ФИЛЬТРАЦИЮ ПРИ ЗАГРУЗКЕ
                 recordsData = filterRecordsForUser(data);
                 renderCalendar();
-                if (document.getElementById('detailContainer').style.display === 'block') {
+                if (detailContainer.style.display === 'block') {
                     const d = Detail.currentDay, 
                         m = Detail.currentMonth || currentMonth, 
                         y = Detail.currentYear || currentYear;
@@ -394,8 +567,7 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
     }
     
     const user = getCurrentUser();
-    const masterSelect = document.getElementById('modalMasterName');
-    const masterName = masterSelect ? masterSelect.value : (user ? user.name : 'Мастер');
+    const masterName = modalMasterName ? modalMasterName.value : (user ? user.name : 'Мастер');
     
     const record = {
         date,
@@ -410,12 +582,10 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
         createdAt: firebase.database.ServerValue.TIMESTAMP
     };
     
-    // Если редактируем существующую запись
     if (editingRecordId) {
         record.id = editingRecordId;
         try {
             await firebaseSync.updateRecord(editingRecordId, date, record);
-            // Обновляем локальные данные с фильтрацией
             const allData = await firebaseSync.loadAllRecords();
             recordsData = filterRecordsForUser(allData);
             addNotification('✏️ Обновлена запись: ' + serviceType + ' на ' + date + ' ' + startHour + ':00');
@@ -423,45 +593,42 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
             renderCalendar();
             refreshDetail();
             closeModal();
-            showToast('✅ Запись обновлена!');
+            showToast(TEXTS.messages.recordUpdated);
             editingRecordId = null;
             return;
         } catch (error) {
             console.error('❌ Ошибка обновления:', error);
-            showToast('❌ Ошибка обновления', 'error');
+            showToast(TEXTS.messages.recordLoadError, 'error');
             return;
         }
     }
     
-    // Новая запись
     try {
         const id = await firebaseSync.addRecord(record);
         record.id = id;
         scheduleReminder(record);
         addNotification('📝 Добавлена запись: ' + serviceType + ' на ' + date + ' ' + startHour + ':00');
         sendSystemNotification('Новая запись', serviceType + ' на ' + date + ' ' + startHour + ':00');
-        closeModal();
-        showToast('✅ Запись сохранена!');
-        // Обновляем данные с фильтрацией
         const allData = await firebaseSync.loadAllRecords();
         recordsData = filterRecordsForUser(allData);
         renderCalendar();
         refreshDetail();
+        closeModal();
+        showToast(TEXTS.messages.recordSaved);
         if (openLetter && serviceType !== 'Выходной') {
             setTimeout(() => openModalWithLetter(record), 300);
         }
     } catch (error) {
         console.error('❌ Ошибка сохранения:', error);
-        showToast('❌ Ошибка сохранения в облако', 'error');
+        showToast(TEXTS.messages.recordLoadError, 'error');
     }
 }
 
 async function deleteRecordFromDB(id, dateKey, serviceType) {
-    if (!confirm('Отменить запись?')) return;
+    if (!confirm(TEXTS.messages.deleteConfirm)) return;
     
     try {
         await firebaseSync.deleteRecord(id, dateKey);
-        // Обновляем данные с фильтрацией
         const allData = await firebaseSync.loadAllRecords();
         recordsData = filterRecordsForUser(allData);
         addNotification('🗑️ Удалена запись: ' + serviceType);
@@ -469,21 +636,21 @@ async function deleteRecordFromDB(id, dateKey, serviceType) {
         renderCalendar();
         refreshDetail();
         closeModal();
-        showToast('🗑️ Запись удалена');
+        showToast(TEXTS.messages.recordDeleted);
     } catch (error) {
         console.error('❌ Ошибка удаления:', error);
-        showToast('❌ Ошибка удаления', 'error');
+        showToast(TEXTS.messages.recordLoadError, 'error');
     }
 }
 
 function refreshDetail() {
-    if (document.getElementById('detailContainer').style.display === 'block') {
+    if (detailContainer.style.display === 'block') {
         Detail.show(Detail.currentDay, currentMonth, currentYear);
     }
 }
 
 function closeModal() {
-    document.getElementById('modalOverlay').style.display = 'none';
+    modalOverlay.style.display = 'none';
     editingRecordId = null;
     currentModalTab = 'main';
 }
@@ -525,10 +692,9 @@ function sendSystemNotification(title, body) {
 }
 
 function updateBadge() {
-    const badge = document.getElementById('notifBadge');
-    if (badge) {
-        badge.style.display = unreadCount > 0 ? 'inline' : 'none';
-        badge.textContent = unreadCount;
+    if (notifBadge) {
+        notifBadge.style.display = unreadCount > 0 ? 'inline' : 'none';
+        notifBadge.textContent = unreadCount;
     }
     updateFavicon(unreadCount);
 }
@@ -543,10 +709,9 @@ function updateFavicon(count) {
 }
 
 function showNotificationsList() {
-    const modal = document.getElementById('notificationsModal'), list = document.getElementById('notificationsList');
-    if (!modal || !list) return;
+    if (!notificationsModal || !notificationsList) return;
     let html = notifications.length === 0 
-        ? '<p style="color:#7B8D8E;text-align:center;padding:20px;">Нет уведомлений</p>'
+        ? '<p style="color:#7B8D8E;text-align:center;padding:20px;">' + TEXTS.titles.noRecords + '</p>'
         : notifications.map(n => {
             const date = new Date(n.timestamp);
             const isRead = n.read;
@@ -554,8 +719,8 @@ function showNotificationsList() {
                 '<div style="font-size:14px;color:' + (isRead ? '#7B8D8E' : '#37474F') + ';">' + n.message + '</div>' +
                 '<div style="font-size:11px;color:#7B8D8E;margin-top:4px;">' + date.toLocaleDateString() + ' ' + date.toLocaleTimeString() + '</div></div>';
         }).join('');
-    list.innerHTML = html;
-    modal.style.display = 'flex';
+    notificationsList.innerHTML = html;
+    notificationsModal.style.display = 'flex';
     notifications.forEach(n => n.read = true);
     saveNotifications();
 }
@@ -565,18 +730,16 @@ function showNotificationsList() {
 // ============================================
 
 function renderCalendar(direction) {
-    const container = document.getElementById('calendarContainer');
-    if (!container) return;
-    const loader = document.getElementById('loader');
+    if (!calendarContainer) return;
     if (loader) loader.style.display = 'none';
     
-    container.innerHTML = '';
+    calendarContainer.innerHTML = '';
     
     if (direction && !isAnimating) {
         isAnimating = true;
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'position:relative;overflow:hidden;height:auto;';
-        container.appendChild(wrapper);
+        calendarContainer.appendChild(wrapper);
         const oldContent = document.createElement('div');
         oldContent.innerHTML = buildCalendarHTML();
         wrapper.appendChild(oldContent);
@@ -584,7 +747,7 @@ function renderCalendar(direction) {
         newContent.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
         newContent.style.transform = direction === 'next' ? 'translateX(100%)' : 'translateX(-100%)';
         newContent.style.transition = 'none';
-        container.appendChild(newContent);
+        calendarContainer.appendChild(newContent);
         newContent.innerHTML = buildCalendarHTML();
         requestAnimationFrame(() => {
             oldContent.style.transition = 'transform 0.3s ease';
@@ -593,28 +756,28 @@ function renderCalendar(direction) {
             newContent.style.transform = 'translateX(0)';
         });
         setTimeout(() => {
-            container.innerHTML = '';
-            container.innerHTML = buildCalendarHTML();
-            renderCalendarDays(container);
+            calendarContainer.innerHTML = '';
+            calendarContainer.innerHTML = buildCalendarHTML();
+            renderCalendarDays(calendarContainer);
             isAnimating = false;
         }, 350);
         return;
     }
     
-    container.innerHTML = buildCalendarHTML();
-    renderCalendarDays(container);
+    calendarContainer.innerHTML = buildCalendarHTML();
+    renderCalendarDays(calendarContainer);
 }
 
 function buildCalendarHTML() {
     let html = `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0 10px;border-bottom:1px solid #E0F2F1;">
             <button id="prevMonth" style="background:none;border:none;font-size:24px;color:#008080;cursor:pointer;padding:0 12px;">‹</button>
-            <span style="font-size:18px;font-weight:600;color:#008080;">${new Date(currentYear, currentMonth - 1).toLocaleString('ru', { month: 'long', year: 'numeric' })}</span>
+            <span style="font-size:18px;font-weight:600;color:#008080;">${getMonthTitle(currentMonth)} ${currentYear}</span>
             <button id="nextMonth" style="background:none;border:none;font-size:24px;color:#008080;cursor:pointer;padding:0 12px;">›</button>
         </div>
         <div class="calendar-grid">
     `;
-    ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].forEach(day => {
+    TEXTS.weekdays.forEach(day => {
         html += `<div style="text-align:center;font-size:10px;font-weight:600;color:#7B8D8E;padding:2px 0 4px;text-transform:uppercase;">${day}</div>`;
     });
     const firstDay = new Date(currentYear, currentMonth - 1, 1);
@@ -683,21 +846,18 @@ function drawTile(canvas, day, isPast) {
     
     const user = getCurrentUser();
     const currentUserName = user ? user.name : null;
-    const hourWidth = (Math.PI*2) / WORKING_HOURS;
-    const startAngle = Math.PI;
     
-    for (let i = 0; i < WORKING_HOURS; i++) {
+    for (let i = 0; i < 12; i++) {
         const hour = 9 + i;
-        const angleStart = startAngle + i * hourWidth;
-        const angleEnd = angleStart + hourWidth;
-        let isBooked = false, color = GRAY, serviceType = '', isOwn = false;
+        const angleStart = Math.PI + i * (Math.PI*2 / 12);
+        const angleEnd = Math.PI + (i + 1) * (Math.PI*2 / 12);
+        let isBooked = false, color = getUIColor('Чужие записи'), serviceType = '', isOwn = false;
         for (const r of dayRecords) {
             if (hour >= r.startHour && hour < r.endHour) {
                 isBooked = true;
                 serviceType = r.serviceType;
-                // Проверяем по полю "master", а не по userId
                 isOwn = currentUserName && r.master === currentUserName;
-                color = isOwn ? (COLORS[serviceType] || GRAY) : GRAY;
+                color = isOwn ? getServiceColor(serviceType) : getUIColor('Чужие записи');
                 break;
             }
         }
@@ -712,15 +872,15 @@ function drawTile(canvas, day, isPast) {
         
         if (isBooked) {
             const alpha = isPast ? '20' : '40';
-            const fillColor = isOwn ? color + alpha : GRAY + '40';
-            const strokeColor = isOwn ? (isPast ? color + '60' : color) : GRAY;
-            ctx.fillStyle = shouldBeGray ? GRAY + '40' : fillColor;
+            const fillColor = isOwn ? color + alpha : getUIColor('Чужие записи') + '40';
+            const strokeColor = isOwn ? (isPast ? color + '60' : color) : getUIColor('Чужие записи');
+            ctx.fillStyle = shouldBeGray ? getUIColor('Чужие записи') + '40' : fillColor;
             ctx.fill();
-            ctx.strokeStyle = shouldBeGray ? GRAY : strokeColor;
+            ctx.strokeStyle = shouldBeGray ? getUIColor('Чужие записи') : strokeColor;
             ctx.lineWidth = 2.5;
             ctx.stroke();
         } else if (isFree && !isPast) {
-            ctx.fillStyle = '#4CAF50';
+            ctx.fillStyle = getUIColor('Свободные слоты');
             ctx.fill();
             ctx.strokeStyle = '#388E3C';
             ctx.lineWidth = 1;
@@ -752,7 +912,7 @@ function updateFilterColors() {
             chip.style.boxShadow = chip.style.background = chip.style.color = '';
             return;
         }
-        const color = COLORS[type] || '#008080';
+        const color = getServiceColor(type);
         chip.style.boxShadow = 'inset 0 0 0 3px ' + color;
         if (chip.classList.contains('active')) {
             chip.style.background = color;
@@ -767,13 +927,16 @@ function updateFilterColors() {
 }
 
 function initFilters() {
-    document.querySelectorAll('.filter-chip').forEach(chip => {
+    if (!filtersContainer) return;
+    const grid = filtersContainer.querySelector('div');
+    if (!grid) return;
+    grid.querySelectorAll('.filter-chip').forEach(chip => {
         chip.addEventListener('click', function() {
             const type = this.dataset.type;
             if (type === 'all') { filterType = 'all'; isFreeMode = false; }
             else if (type === 'free') { filterType = 'free'; isFreeMode = true; }
             else { filterType = type; isFreeMode = false; }
-            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            grid.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
             this.classList.add('active');
             updateFilterColors();
             renderCalendar();
@@ -786,8 +949,7 @@ function initFilters() {
 // ============================================
 
 function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
-    const overlay = document.getElementById('modalOverlay');
-    if (!overlay) return;
+    if (!modalOverlay) return;
     
     loadMastersList();
     
@@ -805,25 +967,22 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         }
     }
     
-    const letterTab = document.getElementById('modalTabLetter');
-    if (letterTab) {
-        letterTab.style.pointerEvents = (isNew || isDayOff || readOnly) ? 'none' : 'auto';
-        letterTab.style.opacity = (isNew || isDayOff || readOnly) ? '0.5' : '1';
-    }
+    modalTabLetter.style.pointerEvents = (isNew || isDayOff || readOnly) ? 'none' : 'auto';
+    modalTabLetter.style.opacity = (isNew || isDayOff || readOnly) ? '0.5' : '1';
     
     if (isNew) { currentModalTab = 'main'; switchTab('main'); }
     else { switchTab(currentModalTab); }
     
-    document.getElementById('modalTitle').textContent = isNew ? '📝 Новая запись' : (readOnly ? '👁️ Просмотр записи' : '✏️ Редактирование записи');
-    document.getElementById('modalDate').textContent = formatModalDate(dateKey);
+    modalTitle.textContent = isNew ? TEXTS.titles.newRecord : (readOnly ? TEXTS.titles.viewRecord : TEXTS.titles.editRecord);
+    modalDate.textContent = formatModalDate(dateKey);
     
     function toggleClientFields(serviceType) {
         const isDayOffField = serviceType === 'Выходной';
-        const nameGroup = document.getElementById('modalClientName').closest('.form-group');
-        const phoneGroup = document.getElementById('modalClientPhone').closest('.form-group');
+        const nameGroup = modalClientName.closest('.form-group');
+        const phoneGroup = modalClientPhone.closest('.form-group');
         if (isDayOffField || readOnly) {
-            document.getElementById('modalClientName').value = '';
-            document.getElementById('modalClientPhone').value = '';
+            modalClientName.value = '';
+            modalClientPhone.value = '';
             if (nameGroup) nameGroup.style.display = 'none';
             if (phoneGroup) phoneGroup.style.display = 'none';
         } else {
@@ -836,106 +995,99 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         const dayRecords = recordsData[dateKey] || [];
         const record = dayRecords.find(r => String(r.id) === String(recordId));
         if (record) {
-            document.getElementById('modalService').value = record.serviceType;
-            document.getElementById('modalStartHour').value = record.startHour;
-            document.getElementById('modalEndHour').value = record.endHour;
-            document.getElementById('modalClientName').value = record.clientName || '';
-            document.getElementById('modalClientPhone').value = record.clientPhone || '';
-            document.getElementById('modalNote').value = record.note || '';
-            document.getElementById('modalMasterName').value = record.master || '';
+            modalService.value = record.serviceType || '';
+            modalStartHour.value = record.startHour || '';
+            modalEndHour.value = record.endHour || '';
+            modalClientName.value = record.clientName || '';
+            modalClientPhone.value = record.clientPhone || '';
+            modalNote.value = record.note || '';
+            modalMasterName.value = record.master || '';
             
-            overlay.dataset.deleteId = String(record.id);
-            overlay.dataset.deleteDate = record.date;
-            overlay.dataset.deleteService = record.serviceType;
+            modalOverlay.dataset.deleteId = String(record.id);
+            modalOverlay.dataset.deleteDate = record.date;
+            modalOverlay.dataset.deleteService = record.serviceType;
             
             if (record.serviceType !== 'Выходной' && !readOnly) {
                 renderLetterTemplates(record);
             } else {
-                document.getElementById('modalLetterContainer').innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">Шаблоны не доступны</p>';
+                modalLetterContainer.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">' + TEXTS.titles.noTemplatesAvailable + '</p>';
             }
             toggleClientFields(record.serviceType);
             
-            // Блокируем поля если readOnly
-            ['modalService', 'modalStartHour', 'modalEndHour', 'modalClientName', 'modalClientPhone', 'modalNote', 'modalMasterName'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.disabled = readOnly;
-            });
-            document.getElementById('modalSave').style.display = readOnly ? 'none' : 'block';
-            document.getElementById('modalDeleteTopBtn').style.display = readOnly ? 'none' : 'block';
+            modalService.disabled = readOnly;
+            modalStartHour.disabled = readOnly;
+            modalEndHour.disabled = readOnly;
+            modalClientName.disabled = readOnly;
+            modalClientPhone.disabled = readOnly;
+            modalNote.disabled = readOnly;
+            modalMasterName.disabled = readOnly;
             
-            // Обновляем список конечного времени
-            updateEndHourOptions(parseInt(document.getElementById('modalStartHour').value));
+            modalSave.style.display = readOnly ? 'none' : 'block';
+            modalDeleteTopBtn.style.display = readOnly ? 'none' : 'block';
+            
+            updateEndHourOptions(parseInt(modalStartHour.value));
         } else {
             editingRecordId = null;
-            document.getElementById('modalService').value = 'Кератин';
-            document.getElementById('modalStartHour').value = 9;
-            document.getElementById('modalEndHour').value = 10;
-            ['modalClientName', 'modalClientPhone', 'modalNote'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('modalLetterContainer').innerHTML = '';
-            toggleClientFields('Кератин');
-            document.getElementById('modalTitle').textContent = '📝 Новая запись';
+            modalService.value = SERVICE_KEYS[0];
+            modalStartHour.value = 9;
+            modalEndHour.value = 10;
+            modalClientName.value = '';
+            modalClientPhone.value = '';
+            modalNote.value = '';
+            modalLetterContainer.innerHTML = '';
+            toggleClientFields(SERVICE_KEYS[0]);
+            modalTitle.textContent = TEXTS.titles.newRecord;
             updateEndHourOptions(9);
+            
+            const user = getCurrentUser();
+            if (user && user.name && modalMasterName) {
+                modalMasterName.value = user.name;
+            }
         }
     } else {
-        document.getElementById('modalService').value = 'Кератин';
-        document.getElementById('modalStartHour').value = selectedRange ? selectedRange.start : 9;
-        document.getElementById('modalEndHour').value = selectedRange ? selectedRange.end : 10;
-        ['modalClientName', 'modalClientPhone', 'modalNote'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('modalLetterContainer').innerHTML = '';
-        toggleClientFields('Кератин');
+        modalService.value = SERVICE_KEYS[0];
+        modalStartHour.value = selectedRange ? selectedRange.start : 9;
+        modalEndHour.value = selectedRange ? selectedRange.end : 10;
+        modalClientName.value = '';
+        modalClientPhone.value = '';
+        modalNote.value = '';
+        modalLetterContainer.innerHTML = '';
+        toggleClientFields(SERVICE_KEYS[0]);
         updateEndHourOptions(selectedRange ? selectedRange.start : 9);
         
         const user = getCurrentUser();
-        const masterSelect = document.getElementById('modalMasterName');
-        if (user && user.name && masterSelect) {
-            const options = masterSelect.options;
-            let found = false;
-            for (let i = 0; i < options.length; i++) {
-                if (options[i].value === user.name) {
-                    masterSelect.selectedIndex = i;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found && options.length > 0) {
-                const option = document.createElement('option');
-                option.value = user.name;
-                option.textContent = user.name;
-                masterSelect.appendChild(option);
-                masterSelect.value = user.name;
-            }
+        if (user && user.name && modalMasterName) {
+            modalMasterName.value = user.name;
         }
     }
     
-    document.getElementById('modalLoading').style.display = 'none';
-    document.getElementById('modalSave').disabled = readOnly;
-    overlay.style.display = 'flex';
-    overlay.dataset.date = dateKey;
+    modalLoading.style.display = 'none';
+    modalSave.disabled = readOnly;
+    modalOverlay.style.display = 'flex';
+    modalOverlay.dataset.date = dateKey;
 }
 
 function updateEndHourOptions(startHour) {
-    const endSelect = document.getElementById('modalEndHour');
-    if (!endSelect) return;
-    const currentValue = parseInt(endSelect.value);
-    endSelect.innerHTML = '';
+    if (!modalEndHour) return;
+    const currentValue = parseInt(modalEndHour.value);
+    modalEndHour.innerHTML = '';
     for (let i = Math.max(10, startHour + 1); i <= 21; i++) {
         const option = document.createElement('option');
         option.value = i;
         option.textContent = String(i).padStart(2, '0') + ':00';
-        endSelect.appendChild(option);
+        modalEndHour.appendChild(option);
     }
-    if (endSelect.options.length > 0) {
+    if (modalEndHour.options.length > 0) {
         if (currentValue >= startHour + 1 && currentValue <= 21) {
-            endSelect.value = currentValue;
+            modalEndHour.value = currentValue;
         } else {
-            endSelect.value = endSelect.options[0].value;
+            modalEndHour.value = modalEndHour.options[0].value;
         }
     }
 }
 
 function renderLetterTemplates(record) {
-    const container = document.getElementById('modalLetterContainer');
-    if (!container) return;
+    if (!modalLetterContainer) return;
     
     const templates = [
         { key: 'new', label: 'Шаблон новой записи', template: templateText },
@@ -956,8 +1108,9 @@ function renderLetterTemplates(record) {
         `;
     });
     
-    container.innerHTML = html;
-    container.querySelectorAll('.copy-letter-btn').forEach(btn => {
+    modalLetterContainer.innerHTML = html;
+    
+    modalLetterContainer.querySelectorAll('.copy-letter-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
             const text = decodeURIComponent(this.dataset.text);
@@ -967,9 +1120,9 @@ function renderLetterTemplates(record) {
 }
 
 function copyLetterText(text) {
-    if (!text || !text.trim()) { showToast('❌ Нет текста для копирования', 'error'); return; }
+    if (!text || !text.trim()) { showToast(TEXTS.messages.noTextToCopy, 'error'); return; }
     if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(text).then(() => showToast('✅ Текст скопирован!'))
+        navigator.clipboard.writeText(text).then(() => showToast(TEXTS.messages.copySuccess))
             .catch(() => copyTextFallback(text));
     } else copyTextFallback(text);
 }
@@ -980,157 +1133,138 @@ function copyTextFallback(text) {
     ta.style.cssText = 'position:fixed;opacity:0';
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand('copy'); showToast('✅ Текст скопирован!'); } 
-    catch { showToast('❌ Не удалось скопировать', 'error'); }
+    try { document.execCommand('copy'); showToast(TEXTS.messages.copySuccess); } 
+    catch { showToast(TEXTS.messages.copyError, 'error'); }
     document.body.removeChild(ta);
 }
 
 function switchTab(tab) {
     currentModalTab = tab;
-    const mainTab = document.getElementById('modalTabMain');
-    const letterTab = document.getElementById('modalTabLetter');
-    const mainContent = document.getElementById('modalMainContent');
-    const letterContent = document.getElementById('modalLetterContent');
-    const saveBtn = document.getElementById('modalSave');
-    const deleteTopBtn = document.getElementById('modalDeleteTopBtn');
-    
     const isMain = tab === 'main';
-    mainTab.classList.toggle('active', isMain);
-    mainTab.style.color = isMain ? '#008080' : '#7B8D8E';
-    mainTab.style.borderBottomColor = isMain ? '#008080' : 'transparent';
-    letterTab.classList.toggle('active', !isMain);
-    letterTab.style.color = !isMain ? '#008080' : '#7B8D8E';
-    letterTab.style.borderBottomColor = !isMain ? '#008080' : 'transparent';
-    mainContent.style.display = isMain ? 'block' : 'none';
-    letterContent.style.display = isMain ? 'none' : 'block';
-    saveBtn.style.display = isMain ? 'block' : 'none';
-    deleteTopBtn.style.display = (isMain && editingRecordId) ? 'block' : 'none';
+    modalTabMain.classList.toggle('active', isMain);
+    modalTabMain.style.color = isMain ? '#008080' : '#7B8D8E';
+    modalTabMain.style.borderBottomColor = isMain ? '#008080' : 'transparent';
+    modalTabLetter.classList.toggle('active', !isMain);
+    modalTabLetter.style.color = !isMain ? '#008080' : '#7B8D8E';
+    modalTabLetter.style.borderBottomColor = !isMain ? '#008080' : 'transparent';
+    modalMainContent.style.display = isMain ? 'block' : 'none';
+    modalLetterContent.style.display = isMain ? 'none' : 'block';
+    modalSave.style.display = isMain ? 'block' : 'none';
+    modalDeleteTopBtn.style.display = (isMain && editingRecordId) ? 'block' : 'none';
 }
 
 function saveRecordFromModal() {
-    const overlay = document.getElementById('modalOverlay');
-    if (!overlay) return;
-    const date = overlay.dataset.date;
-    const startHour = document.getElementById('modalStartHour').value;
-    const endHour = document.getElementById('modalEndHour').value;
+    if (!modalOverlay) return;
+    const date = modalOverlay.dataset.date;
+    const startHour = modalStartHour.value;
+    const endHour = modalEndHour.value;
     if (parseInt(startHour) >= parseInt(endHour)) {
-        showToast('❌ Время начала должно быть меньше окончания', 'error');
+        showToast(TEXTS.messages.timeError, 'error');
         return;
     }
-    document.getElementById('modalLoading').style.display = 'block';
-    document.getElementById('modalSave').disabled = true;
+    modalLoading.style.display = 'block';
+    modalSave.disabled = true;
     saveRecord(
         date, startHour, endHour,
-        document.getElementById('modalService').value,
-        document.getElementById('modalClientName').value.trim(),
-        document.getElementById('modalClientPhone').value.trim(),
-        document.getElementById('modalNote').value,
+        modalService.value,
+        modalClientName.value.trim(),
+        modalClientPhone.value.trim(),
+        modalNote.value,
         !editingRecordId
     );
 }
 
 function initModal() {
-    const closeBtn = document.getElementById('modalCloseBtn');
-    if (closeBtn) closeBtn.addEventListener('click', function(e) { e.preventDefault(); closeModal(); });
+    modalCloseBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        closeModal();
+    });
     
-    const overlay = document.getElementById('modalOverlay');
-    if (overlay) overlay.addEventListener('click', function(e) { if (e.target === e.currentTarget) closeModal(); });
+    modalOverlay.addEventListener('click', function(e) {
+        if (e.target === e.currentTarget) closeModal();
+    });
     
-    const saveBtn = document.getElementById('modalSave');
-    if (saveBtn) saveBtn.addEventListener('click', function(e) { e.preventDefault(); saveRecordFromModal(); });
+    modalSave.addEventListener('click', function(e) {
+        e.preventDefault();
+        saveRecordFromModal();
+    });
     
-    const deleteTopBtn = document.getElementById('modalDeleteTopBtn');
-    if (deleteTopBtn) {
-        const newDeleteBtn = deleteTopBtn.cloneNode(true);
-        deleteTopBtn.parentNode.replaceChild(newDeleteBtn, deleteTopBtn);
-        newDeleteBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const overlay2 = document.getElementById('modalOverlay');
-            const id = overlay2.dataset.deleteId;
-            const dateKey = overlay2.dataset.deleteDate;
-            const serviceType = overlay2.dataset.deleteService;
-            if (!id || !dateKey) {
-                showToast('❌ Ошибка: не найдена запись для удаления', 'error');
-                return;
-            }
-            deleteRecordFromDB(String(id), dateKey, serviceType);
-        });
-    }
+    const newDeleteBtn = modalDeleteTopBtn.cloneNode(true);
+    modalDeleteTopBtn.parentNode.replaceChild(newDeleteBtn, modalDeleteTopBtn);
+    modalDeleteTopBtn = newDeleteBtn;
     
-    const mainTab = document.getElementById('modalTabMain');
-    if (mainTab) mainTab.addEventListener('click', function(e) { e.preventDefault(); switchTab('main'); });
-    
-    const letterTab = document.getElementById('modalTabLetter');
-    if (letterTab) {
-        letterTab.addEventListener('click', function(e) {
-            e.preventDefault();
-            if (this.style.pointerEvents === 'none') return;
-            switchTab('letter');
-            const overlay2 = document.getElementById('modalOverlay');
-            if (overlay2 && overlay2.dataset.date) {
-                const dateKey = overlay2.dataset.date;
-                const recordId = editingRecordId;
-                const dayRecords = recordsData[dateKey] || [];
-                const record = dayRecords.find(r => String(r.id) === String(recordId));
-                if (record) renderLetterTemplates(record);
-            }
-        });
-    }
-    
-    const startSelect = document.getElementById('modalStartHour');
-    const endSelect = document.getElementById('modalEndHour');
-    if (startSelect) {
-        startSelect.innerHTML = '';
-        for (let i = 9; i <= 20; i++) {
-            const option = document.createElement('option');
-            option.value = i;
-            option.textContent = String(i).padStart(2, '0') + ':00';
-            startSelect.appendChild(option);
+    modalDeleteTopBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = modalOverlay.dataset.deleteId;
+        const dateKey = modalOverlay.dataset.deleteDate;
+        const serviceType = modalOverlay.dataset.deleteService;
+        if (!id || !dateKey) {
+            showToast('❌ Ошибка: не найдена запись для удаления', 'error');
+            return;
         }
-        startSelect.addEventListener('change', function() {
-            updateEndHourOptions(parseInt(this.value));
-        });
-    }
-    if (endSelect) {
-        endSelect.innerHTML = '';
-        for (let i = 10; i <= 21; i++) {
-            const option = document.createElement('option');
-            option.value = i;
-            option.textContent = String(i).padStart(2, '0') + ':00';
-            endSelect.appendChild(option);
+        deleteRecordFromDB(String(id), dateKey, serviceType);
+    });
+    
+    modalTabMain.addEventListener('click', function(e) {
+        e.preventDefault();
+        switchTab('main');
+    });
+    
+    modalTabLetter.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (this.style.pointerEvents === 'none') return;
+        switchTab('letter');
+        if (modalOverlay.dataset.date) {
+            const dateKey = modalOverlay.dataset.date;
+            const recordId = editingRecordId;
+            const dayRecords = recordsData[dateKey] || [];
+            const record = dayRecords.find(r => String(r.id) === String(recordId));
+            if (record) renderLetterTemplates(record);
         }
+    });
+    
+    modalService.innerHTML = '';
+    SERVICE_KEYS.forEach(key => {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = SERVICES[key].displayName;
+        modalService.appendChild(option);
+    });
+    
+    modalStartHour.innerHTML = '';
+    for (let i = 9; i <= 20; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = String(i).padStart(2, '0') + ':00';
+        modalStartHour.appendChild(option);
+    }
+    modalStartHour.addEventListener('change', function() {
+        updateEndHourOptions(parseInt(this.value));
+    });
+    
+    modalEndHour.innerHTML = '';
+    for (let i = 10; i <= 21; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = String(i).padStart(2, '0') + ':00';
+        modalEndHour.appendChild(option);
     }
     
-    const serviceSelect = document.getElementById('modalService');
-    if (serviceSelect) {
-        serviceSelect.addEventListener('change', function() {
-            const isDayOff = this.value === 'Выходной';
-            const nameGroup = document.getElementById('modalClientName').closest('.form-group');
-            const phoneGroup = document.getElementById('modalClientPhone').closest('.form-group');
-            if (isDayOff) {
-                document.getElementById('modalClientName').value = '';
-                document.getElementById('modalClientPhone').value = '';
-                if (nameGroup) nameGroup.style.display = 'none';
-                if (phoneGroup) phoneGroup.style.display = 'none';
-            } else {
-                if (nameGroup) nameGroup.style.display = 'block';
-                if (phoneGroup) phoneGroup.style.display = 'block';
-            }
-        });
-    }
-}
-
-function deleteRecordFromModal() {
-    const overlay = document.getElementById('modalOverlay');
-    const id = overlay.dataset.deleteId;
-    const dateKey = overlay.dataset.deleteDate;
-    const serviceType = overlay.dataset.deleteService;
-    if (!id || !dateKey) {
-        showToast('❌ Ошибка: не найдена запись для удаления', 'error');
-        return;
-    }
-    deleteRecordFromDB(String(id), dateKey, serviceType);
+    modalService.addEventListener('change', function() {
+        const isDayOff = this.value === 'Выходной';
+        const nameGroup = modalClientName.closest('.form-group');
+        const phoneGroup = modalClientPhone.closest('.form-group');
+        if (isDayOff) {
+            modalClientName.value = '';
+            modalClientPhone.value = '';
+            if (nameGroup) nameGroup.style.display = 'none';
+            if (phoneGroup) phoneGroup.style.display = 'none';
+        } else {
+            if (nameGroup) nameGroup.style.display = 'block';
+            if (phoneGroup) phoneGroup.style.display = 'block';
+        }
+    });
 }
 
 // ============================================
@@ -1138,27 +1272,14 @@ function deleteRecordFromModal() {
 // ============================================
 
 function openSettings() {
-    document.getElementById('settingsModal').style.display = 'flex';
-    renderSettingsColors();
+    settingsModal.style.display = 'flex';
+    switchSettingsTab('general');
     renderCleanupSettings();
     renderLogoutButton();
-    
-    // ✅ ИНИЦИАЛИЗИРУЕМ АДМИН-ПЕРЕКЛЮЧАТЕЛЬ
+    renderSettingsColors();
     updateAdminSliderUI();
     
-    const adminCheckbox = document.getElementById('settingsAdminMode');
-    if (adminCheckbox) {
-        // Удаляем старые обработчики
-        const newCheckbox = adminCheckbox.cloneNode(true);
-        adminCheckbox.parentNode.replaceChild(newCheckbox, adminCheckbox);
-        newCheckbox.addEventListener('change', function() {
-            toggleAdminMode();
-            // Обновляем UI после переключения
-            updateAdminSliderUI();
-        });
-    }
-    
-    const editBtn = document.getElementById('settingsTemplateEdit');
+    const editBtn = settingsTemplateEdit;
     if (editBtn) {
         const newBtn = editBtn.cloneNode(true);
         editBtn.parentNode.replaceChild(newBtn, editBtn);
@@ -1168,7 +1289,7 @@ function openSettings() {
         });
     }
     
-    const confirmEditBtn = document.getElementById('settingsConfirmTemplateEdit');
+    const confirmEditBtn = settingsConfirmTemplateEdit;
     if (confirmEditBtn) {
         const newBtn = confirmEditBtn.cloneNode(true);
         confirmEditBtn.parentNode.replaceChild(newBtn, confirmEditBtn);
@@ -1177,66 +1298,123 @@ function openSettings() {
             openTemplateEditor('Шаблон подтверждения записи', confirmTemplateText);
         });
     }
+    
+    const tabGeneral = document.getElementById('settingsTabGeneral');
+    const tabColors = document.getElementById('settingsTabColors');
+    
+    if (tabGeneral) {
+        const newTabGeneral = tabGeneral.cloneNode(true);
+        tabGeneral.parentNode.replaceChild(newTabGeneral, tabGeneral);
+        newTabGeneral.addEventListener('click', () => switchSettingsTab('general'));
+    }
+    
+    if (tabColors) {
+        const newTabColors = tabColors.cloneNode(true);
+        tabColors.parentNode.replaceChild(newTabColors, tabColors);
+        newTabColors.addEventListener('click', () => switchSettingsTab('colors'));
+    }
+    
+    const saveColorsBtn = settingsColorsSave;
+    if (saveColorsBtn) {
+        const newBtn = saveColorsBtn.cloneNode(true);
+        saveColorsBtn.parentNode.replaceChild(newBtn, saveColorsBtn);
+        newBtn.addEventListener('click', saveAllColors);
+    }
 }
 
-function renderLogoutButton() {
-    const container = document.getElementById('settingsLogoutContainer');
-    if (!container) return;
-    const user = getCurrentUser();
-    container.innerHTML = `
-        <div style="padding:12px 0;border-top:1px solid #E0F2F1;margin-top:8px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <div>
-                    <div style="font-weight:500;color:#37474F;">👤 ${user ? user.name : 'Пользователь'}</div>
-                    <div style="font-size:12px;color:#7B8D8E;">${user ? user.phone : ''}</div>
-                </div>
-                <button id="settingsLogoutBtn" class="btn btn-danger" style="padding:6px 16px;background:#C62828;color:#FFF;border:none;border-radius:8px;cursor:pointer;">🚪 Выйти</button>
-            </div>
-        </div>
-    `;
-    const logoutBtn = document.getElementById('settingsLogoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', function() {
-            if (confirm('Вы уверены, что хотите выйти из аккаунта?')) {
-                logout();
-            }
-        });
+function switchSettingsTab(tab) {
+    const tabGeneral = document.getElementById('settingsTabGeneral');
+    const tabColors = document.getElementById('settingsTabColors');
+    const contentGeneral = document.getElementById('settingsTabGeneralContent');
+    const contentColors = document.getElementById('settingsTabColorsContent');
+    
+    if (tab === 'general') {
+        if (tabGeneral) {
+            tabGeneral.className = 'settings-tab active';
+            tabGeneral.style.color = '#008080';
+            tabGeneral.style.borderBottomColor = '#008080';
+        }
+        if (tabColors) {
+            tabColors.className = 'settings-tab';
+            tabColors.style.color = '#7B8D8E';
+            tabColors.style.borderBottomColor = 'transparent';
+        }
+        if (contentGeneral) contentGeneral.style.display = 'block';
+        if (contentColors) contentColors.style.display = 'none';
+    } else {
+        if (tabGeneral) {
+            tabGeneral.className = 'settings-tab';
+            tabGeneral.style.color = '#7B8D8E';
+            tabGeneral.style.borderBottomColor = 'transparent';
+        }
+        if (tabColors) {
+            tabColors.className = 'settings-tab active';
+            tabColors.style.color = '#008080';
+            tabColors.style.borderBottomColor = '#008080';
+        }
+        if (contentGeneral) contentGeneral.style.display = 'none';
+        if (contentColors) contentColors.style.display = 'block';
     }
 }
 
 function renderSettingsColors() {
-    const container = document.getElementById('settingsColorsContainer');
-    if (!container) return;
+    if (!settingsColorsContainer) return;
+    
     let html = '';
-    const services = ['Кератин', 'Ботокс', 'Холодное', 'Полировка', 'Выходной'];
-    for (const service of services) {
-        const color = COLORS[service] || '#9E9E9E';
-        const fullName = SERVICE_NAMES[service] || service;
-        html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
-            '<label style="flex:1;font-size:13px;font-weight:500;">' + service + ' (' + fullName + ')</label>' +
-            '<input type="color" value="' + color + '" data-service="' + service + '" style="width:44px;height:36px;border:none;padding:0;cursor:pointer;border-radius:6px;">' +
-            '</div>';
-    }
-    html += '<button class="btn btn-save" id="settingsColorsSave" style="width:100%;margin-top:8px;padding:8px;">Сохранить цвета</button>';
-    container.innerHTML = html;
-    const saveBtn = document.getElementById('settingsColorsSave');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', () => {
-            container.querySelectorAll('input[type="color"]').forEach(inp => COLORS[inp.dataset.service] = inp.value);
-            saveSettings(COLORS);
-            renderCalendar();
-            refreshDetail();
-            updateFilterColors();
-            showToast('✅ Цвета сохранены!');
-        });
-    }
+    SERVICE_KEYS.forEach(key => {
+        const service = SERVICES[key];
+        html += `
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+                <label style="flex:1;font-size:13px;font-weight:500;">${service.displayName}</label>
+                <input type="color" value="${service.color}" data-category="service" data-key="${key}" style="width:44px;height:36px;border:none;padding:0;cursor:pointer;border-radius:6px;">
+            </div>
+        `;
+    });
+    settingsColorsContainer.innerHTML = html;
+    
+    if (!settingsUIColorsContainer) return;
+    
+    let uiHtml = '';
+    Object.entries(UI_COLORS).forEach(([key, data]) => {
+        uiHtml += `
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+                <label style="flex:1;font-size:13px;font-weight:500;">${data.displayName}</label>
+                <input type="color" value="${data.color}" data-category="ui" data-key="${key}" style="width:44px;height:36px;border:none;padding:0;cursor:pointer;border-radius:6px;">
+            </div>
+        `;
+    });
+    settingsUIColorsContainer.innerHTML = uiHtml;
+}
+
+function saveAllColors() {
+    document.querySelectorAll('#settingsColorsContainer input[data-category="service"]').forEach(inp => {
+        SERVICES[inp.dataset.key].color = inp.value;
+    });
+    
+    document.querySelectorAll('#settingsUIColorsContainer input[data-category="ui"]').forEach(inp => {
+        UI_COLORS[inp.dataset.key].color = inp.value;
+    });
+    
+    const colors = {};
+    SERVICE_KEYS.forEach(key => {
+        colors[key] = SERVICES[key].color;
+    });
+    colors._ui = {};
+    Object.entries(UI_COLORS).forEach(([key, data]) => {
+        colors._ui[key] = data.color;
+    });
+    
+    saveSettings(colors);
+    renderCalendar();
+    refreshDetail();
+    updateFilterColors();
+    showToast(TEXTS.messages.settingsSaved);
 }
 
 function renderCleanupSettings() {
-    const container = document.getElementById('settingsCleanupContainer');
-    if (!container) return;
+    if (!settingsCleanupContainer) return;
     const days = getCleanupDays();
-    container.innerHTML = `
+    settingsCleanupContainer.innerHTML = `
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <label style="font-size:13px;color:#7B8D8E;flex-shrink:0;">Очищать историю через (дней):</label>
             <input type="number" id="settingsCleanupDays" class="form-control" style="width:80px;padding:6px 10px;" value="${days}" min="1" max="365">
@@ -1244,6 +1422,7 @@ function renderCleanupSettings() {
         </div>
         <div style="font-size:11px;color:#7B8D8E;margin-top:4px;">Будут удалены записи, шаблоны окошек и уведомления старше указанного количества дней</div>
     `;
+    
     const daysInput = document.getElementById('settingsCleanupDays');
     if (daysInput) {
         daysInput.addEventListener('change', function() {
@@ -1257,12 +1436,13 @@ function renderCleanupSettings() {
             }
         });
     }
+    
     const nowBtn = document.getElementById('settingsCleanupNow');
     if (nowBtn) {
         nowBtn.addEventListener('click', function() {
-            if (confirm('Удалить все записи, шаблоны и уведомления старше ' + getCleanupDays() + ' дней?')) {
+            if (confirm('Удалить все записи, шаблоны окошек и уведомления старше ' + getCleanupDays() + ' дней?')) {
                 performCleanup();
-                showToast('🧹 Очистка запущена!');
+                showToast(TEXTS.messages.cleanupDone);
                 closeSettings();
             }
         });
@@ -1274,6 +1454,7 @@ function performCleanup() {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffTime = cutoff.getTime();
+    
     getAllRecords().then(records => {
         const toDelete = records.filter(r => new Date(r.date).getTime() < cutoffTime);
         toDelete.forEach(r => deleteRecord(r.id));
@@ -1293,35 +1474,66 @@ function performCleanup() {
         }
         renderCalendar();
         updateBadge();
-        showToast('✅ Очистка завершена');
+        showToast(TEXTS.messages.cleanupComplete);
     });
 }
 
 function closeSettings() {
-    document.getElementById('settingsModal').style.display = 'none';
+    settingsModal.style.display = 'none';
+}
+
+function renderLogoutButton() {
+    if (!settingsLogoutContainer) return;
+    const user = getCurrentUser();
+    settingsLogoutContainer.innerHTML = `
+        <div style="padding:12px 0;border-top:1px solid #E0F2F1;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <div style="font-weight:500;color:#37474F;">👤 ${user ? user.name : 'Пользователь'}</div>
+                    <div style="font-size:12px;color:#7B8D8E;">${user ? user.phone : ''}</div>
+                </div>
+                <button id="settingsLogoutBtn" class="btn btn-danger" style="padding:6px 16px;background:#C62828;color:#FFF;border:none;border-radius:8px;cursor:pointer;">🚪 Выйти</button>
+            </div>
+        </div>
+    `;
+    
+    const logoutBtn = document.getElementById('settingsLogoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function() {
+            if (confirm(TEXTS.messages.logoutConfirm)) {
+                logout();
+            }
+        });
+    }
+}
+
+function initSettings() {
+    settingsBtn.addEventListener('click', openSettings);
+    settingsCloseBtn.addEventListener('click', closeSettings);
+    settingsModal.addEventListener('click', e => { if (e.target === e.currentTarget) closeSettings(); });
 }
 
 function openTemplateEditor(title, text) {
     closeSettings();
-    document.getElementById('templateEditorTitle').textContent = '✏️ ' + title;
-    document.getElementById('templateEditorText').value = text;
-    document.getElementById('templateEditorModal').style.display = 'flex';
+    templateEditorTitle.textContent = '✏️ ' + title;
+    templateEditorText.value = text;
+    templateEditorModal.style.display = 'flex';
 }
 
 function closeTemplateEditor() {
-    document.getElementById('templateEditorModal').style.display = 'none';
+    templateEditorModal.style.display = 'none';
 }
 
 function saveTemplateFromEditor() {
-    const text = document.getElementById('templateEditorText').value;
+    const text = templateEditorText.value;
     const key = editingTemplateType === 'new' ? 'letterTemplate' : 'confirmLetterTemplate';
     saveTemplate(key, text);
     closeTemplateEditor();
-    showToast('✅ Шаблон сохранен!');
+    showToast(TEXTS.messages.templateSaved);
 }
 
 function insertVariable(varName) {
-    const ta = document.getElementById('templateEditorText');
+    const ta = templateEditorText;
     const start = ta.selectionStart;
     const text = ta.value;
     const variable = '{{' + varName + '}}';
@@ -1330,17 +1542,11 @@ function insertVariable(varName) {
     ta.selectionStart = ta.selectionEnd = start + variable.length;
 }
 
-function initSettings() {
-    document.getElementById('settingsBtn').addEventListener('click', openSettings);
-    document.getElementById('settingsCloseBtn').addEventListener('click', closeSettings);
-    document.getElementById('settingsModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSettings(); });
-}
-
 function initTemplateEditor() {
-    document.getElementById('templateEditorClose').addEventListener('click', closeTemplateEditor);
-    document.getElementById('templateEditorCancel').addEventListener('click', closeTemplateEditor);
-    document.getElementById('templateEditorSave').addEventListener('click', saveTemplateFromEditor);
-    document.getElementById('templateEditorModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeTemplateEditor(); });
+    templateEditorClose.addEventListener('click', closeTemplateEditor);
+    templateEditorCancel.addEventListener('click', closeTemplateEditor);
+    templateEditorSave.addEventListener('click', saveTemplateFromEditor);
+    templateEditorModal.addEventListener('click', e => { if (e.target === e.currentTarget) closeTemplateEditor(); });
     document.querySelectorAll('[data-var]').forEach(btn => {
         btn.addEventListener('click', () => insertVariable(btn.dataset.var));
     });
@@ -1351,54 +1557,58 @@ function initTemplateEditor() {
 // ============================================
 
 function showStats() {
-    const modal = document.getElementById('statsModal');
-    if (!modal) return;
+    if (!statsModal) return;
     const now = new Date();
-    document.getElementById('statsDateFrom').value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    document.getElementById('statsDateTo').value = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    modal.style.display = 'flex';
+    statsDateFrom.value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    statsDateTo.value = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    statsModal.style.display = 'flex';
     renderStats();
 }
 
 function renderStats() {
-    const container = document.getElementById('statsContent');
-    if (!container) return;
-    const from = document.getElementById('statsDateFrom').value;
-    const to = document.getElementById('statsDateTo').value;
-    if (!from || !to) { container.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">Выберите период</p>'; return; }
+    if (!statsContent) return;
+    const from = statsDateFrom.value;
+    const to = statsDateTo.value;
+    if (!from || !to) { statsContent.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">Выберите период</p>'; return; }
+    
     const fromDate = new Date(from), toDate = new Date(to);
     toDate.setHours(23,59,59,999);
-    const stats = {'Кератин':0,'Ботокс':0,'Холодное':0,'Полировка':0};
+    const stats = {};
+    SERVICE_KEYS.forEach(key => { stats[key] = 0; });
     let total = 0;
+    
     for (const [dateKey, records] of Object.entries(recordsData)) {
         const d = new Date(dateKey);
         if (d >= fromDate && d <= toDate) {
             records.forEach(r => {
-                if (stats[r.serviceType] !== undefined && r.serviceType !== 'Выходной') {
+                if (stats[r.serviceType] !== undefined) {
                     stats[r.serviceType]++;
                     total++;
                 }
             });
         }
     }
-    if (total === 0) { container.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">Нет данных</p>'; return; }
+    
+    if (total === 0) { statsContent.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">' + TEXTS.titles.noRecords + '</p>'; return; }
+    
     const maxCount = Math.max(...Object.values(stats));
     let html = '<div style="margin-bottom:12px;text-align:center;font-size:14px;color:#37474F;">Всего записей: <strong>' + total + '</strong></div>';
     for (const [service, count] of Object.entries(stats)) {
+        if (service === 'Выходной') continue;
         const percent = maxCount > 0 ? (count / maxCount * 100) : 0;
-        const color = COLORS[service] || '#008080';
+        const color = getServiceColor(service);
         html += '<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:3px;"><span>' + service + '</span><span>' + count + '</span></div>' +
             '<div style="height:24px;background:#F0F0F0;border-radius:12px;overflow:hidden;"><div style="height:100%;width:' + percent + '%;background:' + color + ';border-radius:12px;transition:width 0.5s ease;"></div></div></div>';
     }
-    container.innerHTML = html;
+    statsContent.innerHTML = html;
 }
 
 function initStats() {
-    document.getElementById('statsBtn').addEventListener('click', showStats);
-    document.getElementById('statsCloseBtn').addEventListener('click', () => document.getElementById('statsModal').style.display = 'none');
-    document.getElementById('statsModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.target.style.display = 'none'; });
-    document.getElementById('statsDateFrom').addEventListener('change', renderStats);
-    document.getElementById('statsDateTo').addEventListener('change', renderStats);
+    statsBtn.addEventListener('click', showStats);
+    statsCloseBtn.addEventListener('click', () => statsModal.style.display = 'none');
+    statsModal.addEventListener('click', e => { if (e.target === e.currentTarget) e.target.style.display = 'none'; });
+    statsDateFrom.addEventListener('change', renderStats);
+    statsDateTo.addEventListener('change', renderStats);
 }
 
 // ============================================
@@ -1406,18 +1616,22 @@ function initStats() {
 // ============================================
 
 const Detail = {
-    currentDay: null, currentMonth: null, currentYear: null,
-    isInitialized: false, lastMonth: null, lastYear: null,
+    currentDay: null,
+    currentMonth: null,
+    currentYear: null,
+    isInitialized: false,
+    lastMonth: null,
+    lastYear: null,
     
-    show(day, month, year) {
+    show: function(day, month, year) {
         this.currentDay = day;
         this.currentMonth = month;
         this.currentYear = year;
-        document.getElementById('calendarContainer').style.display = 'none';
-        document.getElementById('bottomPanel').style.display = 'none';
-        document.getElementById('filtersContainer').style.display = 'none';
-        document.getElementById('detailContainer').style.display = 'block';
-        document.getElementById('appHeader').style.display = 'none';
+        calendarContainer.style.display = 'none';
+        bottomPanel.style.display = 'none';
+        filtersContainer.style.display = 'none';
+        detailContainer.style.display = 'block';
+        appHeader.style.display = 'none';
         this.updateHeader(month, year);
         if (!this.isInitialized || this.lastMonth !== month || this.lastYear !== year) {
             this.populateCarousel(day, month, year);
@@ -1430,10 +1644,9 @@ const Detail = {
         setTimeout(() => this.focusOnDate(day, month, year), 150);
     },
     
-    focusOnDate(day, month, year) {
-        const track = document.getElementById('carouselTrack');
-        if (!track) return;
-        const items = track.children;
+    focusOnDate: function(day, month, year) {
+        if (!carouselTrack) return;
+        const items = carouselTrack.children;
         let targetIndex = -1;
         for (let i = 0; i < items.length; i++) {
             const el = items[i];
@@ -1449,25 +1662,23 @@ const Detail = {
             setTimeout(() => this.focusOnDate(day, month, year), 50);
             return;
         }
-        const containerWidth = track.parentElement.offsetWidth || 300;
+        const containerWidth = carouselTrack.parentElement.offsetWidth || 300;
         const itemWidth = 58;
         carouselScrollPos = -(targetIndex * itemWidth - containerWidth/2 + itemWidth/2);
-        track.style.transition = 'transform 0.4s ease';
-        track.style.transform = 'translateX(' + carouselScrollPos + 'px)';
-        track.querySelectorAll('.day-tile').forEach((tile, idx) => tile.classList.toggle('active', idx === targetIndex));
+        carouselTrack.style.transition = 'transform 0.4s ease';
+        carouselTrack.style.transform = 'translateX(' + carouselScrollPos + 'px)';
+        carouselTrack.querySelectorAll('.day-tile').forEach((tile, idx) => tile.classList.toggle('active', idx === targetIndex));
         setTimeout(() => this.updateHeaderFromCarousel(), 100);
     },
     
-    updateHeader(month, year) {
-        document.getElementById('detailHeader').textContent = 
-            ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][month-1] + ' ' + year;
+    updateHeader: function(month, year) {
+        detailHeader.textContent = getMonthTitle(month) + ' ' + year;
     },
     
-    updateHeaderFromCarousel() {
-        const track = document.getElementById('carouselTrack');
-        if (!track) return;
-        const containerWidth = track.parentElement.offsetWidth;
-        const items = track.children;
+    updateHeaderFromCarousel: function() {
+        if (!carouselTrack) return;
+        const containerWidth = carouselTrack.parentElement.offsetWidth;
+        const items = carouselTrack.children;
         let closestIdx = 0, closestDist = Infinity;
         const centerX = -carouselScrollPos + containerWidth/2;
         for (let i = 0; i < items.length; i++) {
@@ -1484,15 +1695,13 @@ const Detail = {
     },
     
     populateCarousel: function(day, month, year) {
-        const track = document.getElementById('carouselTrack');
-        if (!track) return;
+        if (!carouselTrack) return;
         const months = [
             { m: month === 1 ? 12 : month - 1, y: month === 1 ? year - 1 : year },
             { m: month, y: year },
             { m: month === 12 ? 1 : month + 1, y: month === 12 ? year + 1 : year }
         ];
-        track.innerHTML = '';
-        const daysOfWeek = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+        carouselTrack.innerHTML = '';
         const user = getCurrentUser();
         const currentUserName = user ? user.name : null;
         
@@ -1537,19 +1746,16 @@ const Detail = {
                     dayRecords = Object.values(dayRecords);
                 }
                 
-                const hourWidth = (Math.PI*2) / WORKING_HOURS;
-                const startAngle = Math.PI;
-                for (let i = 0; i < WORKING_HOURS; i++) {
+                for (let i = 0; i < 12; i++) {
                     const hour = 9 + i;
-                    const angleStart = startAngle + i * hourWidth;
-                    const angleEnd = angleStart + hourWidth;
-                    let isBooked = false, color = GRAY, isOwn = false;
+                    const angleStart = Math.PI + i * (Math.PI*2 / 12);
+                    const angleEnd = Math.PI + (i + 1) * (Math.PI*2 / 12);
+                    let isBooked = false, color = getUIColor('Чужие записи'), isOwn = false;
                     for (const r of dayRecords) {
                         if (hour >= r.startHour && hour < r.endHour) {
                             isBooked = true;
-                            // Проверяем по полю "master", а не по userId
                             isOwn = currentUserName && r.master === currentUserName;
-                            color = isOwn ? (COLORS[r.serviceType] || GRAY) : GRAY;
+                            color = isOwn ? getServiceColor(r.serviceType) : getUIColor('Чужие записи');
                             break;
                         }
                     }
@@ -1559,8 +1765,8 @@ const Detail = {
                     ctx.arc(cx, cy, innerRadius, angleEnd, angleStart);
                     ctx.closePath();
                     if (isBooked) {
-                        const fillColor = isOwn ? color + '40' : GRAY + '40';
-                        const strokeColor = isOwn ? (isPast ? color + '60' : color) : GRAY;
+                        const fillColor = isOwn ? color + '40' : getUIColor('Чужие записи') + '40';
+                        const strokeColor = isOwn ? (isPast ? color + '60' : color) : getUIColor('Чужие записи');
                         ctx.fillStyle = isPast ? color + '20' : fillColor;
                         ctx.fill();
                         ctx.strokeStyle = isPast ? color + '60' : strokeColor;
@@ -1583,7 +1789,7 @@ const Detail = {
                 tile.appendChild(canvas);
                 const label = document.createElement('div');
                 label.className = 'day-label';
-                label.textContent = daysOfWeek[new Date(y, m - 1, d).getDay()];
+                label.textContent = TEXTS.weekdays[new Date(y, m - 1, d).getDay()];
                 wrapper.appendChild(tile);
                 wrapper.appendChild(label);
                 
@@ -1592,16 +1798,15 @@ const Detail = {
                     currentYear = y;
                     this.show(d, m, y);
                 });
-                track.appendChild(wrapper);
+                carouselTrack.appendChild(wrapper);
             }
         });
     },
     
     drawDetailTile: function(day, month, year, highlightHours) {
-        const canvas = document.getElementById('detailCanvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const size = canvas.width, cx = size/2, cy = size/2;
+        if (!detailCanvas) return;
+        const ctx = detailCanvas.getContext('2d');
+        const size = detailCanvas.width, cx = size/2, cy = size/2;
         const radius = size/2 - 20;
         const innerRadius = radius * INNER_RADIUS_RATIO;
         ctx.clearRect(0, 0, size, size);
@@ -1627,22 +1832,19 @@ const Detail = {
         }
         const user = getCurrentUser();
         const currentUserName = user ? user.name : null;
-        const hourWidth = (Math.PI*2) / WORKING_HOURS;
-        const startAngle = Math.PI;
         const isPast = isDayPast(year, month, day);
         
-        for (let i = 0; i < WORKING_HOURS; i++) {
+        for (let i = 0; i < 12; i++) {
             const hour = 9 + i;
-            const angleStart = startAngle + i * hourWidth;
-            const angleEnd = angleStart + hourWidth;
-            let isBooked = false, color = GRAY, serviceType = '', isOwn = false;
+            const angleStart = Math.PI + i * (Math.PI*2 / 12);
+            const angleEnd = Math.PI + (i + 1) * (Math.PI*2 / 12);
+            let isBooked = false, color = getUIColor('Чужие записи'), serviceType = '', isOwn = false;
             for (const r of dayRecords) {
                 if (hour >= r.startHour && hour < r.endHour) {
                     isBooked = true;
                     serviceType = r.serviceType;
-                    // Проверяем по полю "master", а не по userId
                     isOwn = currentUserName && r.master === currentUserName;
-                    color = isOwn ? (COLORS[serviceType] || GRAY) : GRAY;
+                    color = isOwn ? getServiceColor(serviceType) : getUIColor('Чужие записи');
                     break;
                 }
             }
@@ -1653,8 +1855,8 @@ const Detail = {
             ctx.arc(cx, cy, innerRadius, angleEnd, angleStart);
             ctx.closePath();
             if (isBooked) {
-                const fillColor = isOwn ? color + '40' : GRAY + '40';
-                const strokeColor = isOwn ? (isPast ? color + '60' : color) : GRAY;
+                const fillColor = isOwn ? color + '40' : getUIColor('Чужие записи') + '40';
+                const strokeColor = isOwn ? (isPast ? color + '60' : color) : getUIColor('Чужие записи');
                 ctx.fillStyle = isPast ? color + '20' : fillColor;
                 ctx.fill();
                 ctx.strokeStyle = isHighlighted ? '#008080' : (isPast ? strokeColor : strokeColor);
@@ -1675,9 +1877,9 @@ const Detail = {
             }
         }
         const labelRadius = radius + 28;
-        for (let i = 0; i < WORKING_HOURS; i++) {
+        for (let i = 0; i < 12; i++) {
             const hour = 9 + i;
-            const angleStart = startAngle + i * hourWidth;
+            const angleStart = Math.PI + i * (Math.PI*2 / 12);
             const lx = cx + labelRadius * Math.cos(angleStart);
             const ly = cy + labelRadius * Math.sin(angleStart);
             ctx.save();
@@ -1698,22 +1900,21 @@ const Detail = {
         }
         const user = getCurrentUser();
         const currentUserName = user ? user.name : null;
-        const list = document.getElementById('detailRecordsList');
-        list.innerHTML = '';
+        if (!detailRecordsList) return;
+        detailRecordsList.innerHTML = '';
         if (dayRecords.length === 0) {
-            list.innerHTML = '<li style="background:none;color:#7B8D8E;font-size:13px;padding:8px 0;text-align:center;">Нет записей</li>';
+            detailRecordsList.innerHTML = '<li style="background:none;color:#7B8D8E;font-size:13px;padding:8px 0;text-align:center;">' + TEXTS.titles.noRecords + '</li>';
             return;
         }
         dayRecords.sort((a,b) => a.startHour - b.startHour);
         dayRecords.forEach(record => {
             const isOwn = currentUserName && record.master === currentUserName;
-            // ✅ ЕСЛИ АДМИН - ВСЕ ЗАПИСИ ОТКРЫВАЮТСЯ В РЕЖИМЕ РЕДАКТИРОВАНИЯ
             const isAdmin = isAdminMode();
             const canEdit = isOwn || isAdmin;
             
-            const color = canEdit ? (COLORS[record.serviceType] || '#008080') : GRAY;
-            const borderColor = canEdit ? color : GRAY;
-            const bgColor = canEdit ? color + '30' : GRAY + '20';
+            const color = canEdit ? getServiceColor(record.serviceType) : getUIColor('Чужие записи');
+            const borderColor = canEdit ? color : getUIColor('Чужие записи');
+            const bgColor = canEdit ? color + '30' : getUIColor('Чужие записи') + '20';
             const li = document.createElement('li');
             li.style.cssText = `padding:8px 12px;margin-bottom:4px;background:${bgColor};border-radius:8px;cursor:pointer;transition:background 0.2s;border-left:4px solid ${borderColor};`;
             const start = String(record.startHour).padStart(2,'0') + ':00';
@@ -1730,16 +1931,15 @@ const Detail = {
             if (canEdit && record.note) info += '<br><span style="font-size:11px;color:#7B8D8E;margin-left:6px;">📝 ' + record.note + '</span>';
             li.innerHTML = info;
             li.addEventListener('click', () => {
-                // ✅ АДМИН МОЖЕТ РЕДАКТИРОВАТЬ ЛЮБЫЕ ЗАПИСИ
                 if (canEdit) {
                     openModal(day, month, year, null, record.id, false);
                 } else {
                     openModal(day, month, year, null, record.id, true);
                 }
             });
-            li.addEventListener('mouseenter', function() { this.style.background = canEdit ? color + '50' : GRAY + '30'; });
-            li.addEventListener('mouseleave', function() { this.style.background = canEdit ? color + '30' : GRAY + '20'; });
-            list.appendChild(li);
+            li.addEventListener('mouseenter', function() { this.style.background = canEdit ? color + '50' : getUIColor('Чужие записи') + '30'; });
+            li.addEventListener('mouseleave', function() { this.style.background = canEdit ? color + '30' : getUIColor('Чужие записи') + '20'; });
+            detailRecordsList.appendChild(li);
         });
     }
 };
@@ -1751,29 +1951,30 @@ function openDetail(day, month, year) { Detail.show(day, month, year); }
 // ============================================
 
 function initNavigation() {
-    const container = document.getElementById('calendarContainer');
+    if (!calendarContainer) return;
     let touchStartX = 0;
     let touchEndX = 0;
-    if (container) {
-        container.addEventListener('touchstart', function(e) {
-            touchStartX = e.changedTouches[0].screenX;
-        }, { passive: true });
-        container.addEventListener('touchend', function(e) {
-            touchEndX = e.changedTouches[0].screenX;
-            const diff = touchStartX - touchEndX;
-            if (Math.abs(diff) > 50) {
-                const direction = diff > 0 ? 'next' : 'prev';
-                if (diff > 0) {
-                    if (currentMonth === 12) { currentMonth = 1; currentYear++; }
-                    else { currentMonth++; }
-                } else {
-                    if (currentMonth === 1) { currentMonth = 12; currentYear--; }
-                    else { currentMonth--; }
-                }
-                renderCalendar(direction);
+    
+    calendarContainer.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+    
+    calendarContainer.addEventListener('touchend', function(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        const diff = touchStartX - touchEndX;
+        if (Math.abs(diff) > 50) {
+            const direction = diff > 0 ? 'next' : 'prev';
+            if (diff > 0) {
+                if (currentMonth === 12) { currentMonth = 1; currentYear++; }
+                else { currentMonth++; }
+            } else {
+                if (currentMonth === 1) { currentMonth = 12; currentYear--; }
+                else { currentMonth--; }
             }
-        }, { passive: true });
-    }
+            renderCalendar(direction);
+        }
+    }, { passive: true });
+    
     document.addEventListener('click', e => {
         if (e.target.id === 'prevMonth') {
             if (currentMonth === 1) { currentMonth = 12; currentYear--; }
@@ -1789,15 +1990,16 @@ function initNavigation() {
 }
 
 function initDetailControls() {
-    document.getElementById('detailBackBtn').addEventListener('click', () => {
-        document.getElementById('detailContainer').style.display = 'none';
-        document.getElementById('calendarContainer').style.display = 'block';
-        document.getElementById('bottomPanel').style.display = 'flex';
-        document.getElementById('filtersContainer').style.display = 'block';
-        document.getElementById('appHeader').style.display = 'flex';
+    detailBackBtn.addEventListener('click', () => {
+        detailContainer.style.display = 'none';
+        calendarContainer.style.display = 'block';
+        bottomPanel.style.display = 'flex';
+        filtersContainer.style.display = 'block';
+        appHeader.style.display = 'flex';
         renderCalendar();
     });
-    document.getElementById('detailAddBtn').addEventListener('click', () => {
+    
+    detailAddBtn.addEventListener('click', () => {
         if (Detail.currentDay) openModal(Detail.currentDay, currentMonth, currentYear);
     });
 }
@@ -1807,42 +2009,44 @@ function initDetailControls() {
 // ============================================
 
 function initCarousel() {
-    const track = document.getElementById('carouselTrack');
-    if (!track) return;
-    track.addEventListener('mousedown', e => { isDragging = true; startX = e.clientX; startScrollPos = carouselScrollPos; track.style.transition = 'none'; });
+    if (!carouselTrack) return;
+    
+    carouselTrack.addEventListener('mousedown', e => { isDragging = true; startX = e.clientX; startScrollPos = carouselScrollPos; carouselTrack.style.transition = 'none'; });
     document.addEventListener('mousemove', e => {
         if (!isDragging) return;
         carouselScrollPos = startScrollPos + (e.clientX - startX);
-        track.style.transform = 'translateX(' + carouselScrollPos + 'px)';
+        carouselTrack.style.transform = 'translateX(' + carouselScrollPos + 'px)';
     });
     document.addEventListener('mouseup', () => {
         if (!isDragging) return;
         isDragging = false;
-        track.style.transition = 'transform 0.4s ease';
+        carouselTrack.style.transition = 'transform 0.4s ease';
         const itemWidth = 58;
         carouselScrollPos = Math.round(carouselScrollPos / itemWidth) * itemWidth;
-        track.style.transform = 'translateX(' + carouselScrollPos + 'px)';
+        carouselTrack.style.transform = 'translateX(' + carouselScrollPos + 'px)';
         setTimeout(() => Detail.updateHeaderFromCarousel(), 100);
     });
-    track.addEventListener('touchstart', e => { isDragging = true; startX = e.touches[0].clientX; startScrollPos = carouselScrollPos; track.style.transition = 'none'; }, { passive: true });
-    track.addEventListener('touchmove', e => {
+    
+    carouselTrack.addEventListener('touchstart', e => { isDragging = true; startX = e.touches[0].clientX; startScrollPos = carouselScrollPos; carouselTrack.style.transition = 'none'; }, { passive: true });
+    carouselTrack.addEventListener('touchmove', e => {
         if (!isDragging) return;
         carouselScrollPos = startScrollPos + (e.touches[0].clientX - startX);
-        track.style.transform = 'translateX(' + carouselScrollPos + 'px)';
+        carouselTrack.style.transform = 'translateX(' + carouselScrollPos + 'px)';
     }, { passive: true });
-    track.addEventListener('touchend', () => {
+    carouselTrack.addEventListener('touchend', () => {
         if (!isDragging) return;
         isDragging = false;
-        track.style.transition = 'transform 0.4s ease';
+        carouselTrack.style.transition = 'transform 0.4s ease';
         const itemWidth = 58;
         carouselScrollPos = Math.round(carouselScrollPos / itemWidth) * itemWidth;
-        track.style.transform = 'translateX(' + carouselScrollPos + 'px)';
+        carouselTrack.style.transform = 'translateX(' + carouselScrollPos + 'px)';
         setTimeout(() => Detail.updateHeaderFromCarousel(), 100);
     }, { passive: true });
-    track.addEventListener('wheel', e => {
+    
+    carouselTrack.addEventListener('wheel', e => {
         e.preventDefault();
         carouselScrollPos += (e.deltaY > 0 ? -1 : 1) * 58;
-        track.style.transform = 'translateX(' + carouselScrollPos + 'px)';
+        carouselTrack.style.transform = 'translateX(' + carouselScrollPos + 'px)';
         setTimeout(() => Detail.updateHeaderFromCarousel(), 50);
     }, { passive: false });
 }
@@ -1852,46 +2056,43 @@ function initCarousel() {
 // ============================================
 
 function initDetailCanvas() {
-    const canvas = document.getElementById('detailCanvas');
-    if (!canvas) return;
+    if (!detailCanvas) return;
     let rangeStart = null, rangeHours = [], isRangeDragging = false;
     let singleClickTimeout = null;
     let lastHighlightedHour = null;
     
     function getHourFromEvent(e) {
-        const rect = canvas.getBoundingClientRect();
+        const rect = detailCanvas.getBoundingClientRect();
         const clientX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX);
         const clientY = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY);
         if (clientX === undefined || clientY === undefined) return null;
-        const x = (clientX - rect.left) / rect.width * canvas.width;
-        const y = (clientY - rect.top) / rect.height * canvas.height;
-        const cx = canvas.width/2, cy = canvas.height/2;
+        const x = (clientX - rect.left) / rect.width * detailCanvas.width;
+        const y = (clientY - rect.top) / rect.height * detailCanvas.height;
+        const cx = detailCanvas.width/2, cy = detailCanvas.height/2;
         const dist = Math.sqrt((x - cx)**2 + (y - cy)**2);
-        const radiusPx = canvas.width/2 - 20;
+        const radiusPx = detailCanvas.width/2 - 20;
         const innerRadiusPx = radiusPx * INNER_RADIUS_RATIO;
         if (dist < innerRadiusPx || dist > radiusPx) return null;
         const angle = Math.atan2(y - cy, x - cx);
-        let rawHour = Math.floor((angle - Math.PI) / ((Math.PI*2)/WORKING_HOURS));
-        if (rawHour < 0) rawHour += WORKING_HOURS;
-        return 9 + rawHour % WORKING_HOURS;
+        let rawHour = Math.floor((angle - Math.PI) / ((Math.PI*2)/12));
+        if (rawHour < 0) rawHour += 12;
+        return 9 + rawHour % 12;
     }
     
     function getHourCenterAngle(hour) {
-        const startAngle = Math.PI;
-        const hourWidth = (Math.PI*2) / WORKING_HOURS;
-        return startAngle + (hour - 9) * hourWidth + hourWidth / 2;
+        return Math.PI + (hour - 9) * (Math.PI*2 / 12) + (Math.PI*2 / 12) / 2;
     }
     
     function getAngleFromEvent(e) {
-        const rect = canvas.getBoundingClientRect();
+        const rect = detailCanvas.getBoundingClientRect();
         const clientX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX);
         const clientY = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY);
         if (clientX === undefined || clientY === undefined) return null;
-        const x = (clientX - rect.left) / rect.width * canvas.width;
-        const y = (clientY - rect.top) / rect.height * canvas.height;
-        const cx = canvas.width/2, cy = canvas.height/2;
+        const x = (clientX - rect.left) / rect.width * detailCanvas.width;
+        const y = (clientY - rect.top) / rect.height * detailCanvas.height;
+        const cx = detailCanvas.width/2, cy = detailCanvas.height/2;
         const dist = Math.sqrt((x - cx)**2 + (y - cy)**2);
-        const radiusPx = canvas.width/2 - 20;
+        const radiusPx = detailCanvas.width/2 - 20;
         const innerRadiusPx = radiusPx * INNER_RADIUS_RATIO;
         if (dist < innerRadiusPx || dist > radiusPx) return null;
         return Math.atan2(y - cy, x - cx);
@@ -1936,7 +2137,6 @@ function initDetailCanvas() {
         const existingRecord = getRecordAtHour(dateKey, hour);
         if (existingRecord) {
             const isOwn = currentUserName && existingRecord.master === currentUserName;
-            // ✅ АДМИН МОЖЕТ РЕДАКТИРОВАТЬ ЛЮБЫЕ ЗАПИСИ
             const isAdmin = isAdminMode();
             const canEdit = isOwn || isAdmin;
             
@@ -1950,7 +2150,7 @@ function initDetailCanvas() {
         
         const bookedHours = getBookedHours(dateKey);
         if (bookedHours.has(hour)) {
-            showToast('⏰ Это время уже занято', 'error');
+            showToast(TEXTS.messages.timeBusy, 'error');
             return;
         }
         
@@ -1969,7 +2169,6 @@ function initDetailCanvas() {
                 rangeHours = [];
                 Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, []);
                 currentModalTab = 'main';
-                // ✅ НОВАЯ ЗАПИСЬ ВСЕГДА ДОБАВЛЯЕТСЯ В РЕЖИМЕ РЕДАКТИРОВАНИЯ
                 openModal(Detail.currentDay, currentMonth, currentYear, { start, end }, null, false);
             }
             singleClickTimeout = null;
@@ -1990,18 +2189,16 @@ function initDetailCanvas() {
         const startAngleCenter = getHourCenterAngle(start);
         let targetHour = null;
         
-        // Определяем, в каком секторе находится курсор по углу
-        const hourWidth = (Math.PI*2) / WORKING_HOURS;
+        const hourWidth = (Math.PI*2) / 12;
         let rawAngle = angle - Math.PI;
         if (rawAngle < 0) rawAngle += Math.PI * 2;
         const index = Math.floor(rawAngle / hourWidth);
-        targetHour = 9 + (index % WORKING_HOURS);
-        if (targetHour < 9) targetHour += WORKING_HOURS;
+        targetHour = 9 + (index % 12);
+        if (targetHour < 9) targetHour += 12;
         if (targetHour > 20) targetHour = 20;
         
         if (targetHour === null || targetHour === lastHighlightedHour) return;
         
-        // Проверяем, пересек ли курсор середину целевого сектора
         const targetAngleCenter = getHourCenterAngle(targetHour);
         let angleDiff = angle - targetAngleCenter;
         if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
@@ -2057,13 +2254,13 @@ function initDetailCanvas() {
         Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, []);
     }
     
-    canvas.addEventListener('mousedown', handleStart);
-    canvas.addEventListener('mousemove', handleMove);
-    canvas.addEventListener('mouseup', handleEnd);
-    canvas.addEventListener('mouseleave', () => {});
-    canvas.addEventListener('touchstart', handleStart, { passive: false });
-    canvas.addEventListener('touchmove', handleMove, { passive: false });
-    canvas.addEventListener('touchend', handleEnd, { passive: false });
+    detailCanvas.addEventListener('mousedown', handleStart);
+    detailCanvas.addEventListener('mousemove', handleMove);
+    detailCanvas.addEventListener('mouseup', handleEnd);
+    detailCanvas.addEventListener('mouseleave', () => {});
+    detailCanvas.addEventListener('touchstart', handleStart, { passive: false });
+    detailCanvas.addEventListener('touchmove', handleMove, { passive: false });
+    detailCanvas.addEventListener('touchend', handleEnd, { passive: false });
 }
 
 // ============================================
@@ -2091,9 +2288,9 @@ function showToast(message, type = 'success') {
 // ============================================
 
 function initNotifications() {
-    document.getElementById('notificationsBtn').addEventListener('click', showNotificationsList);
-    document.getElementById('notificationsCloseBtn').addEventListener('click', () => document.getElementById('notificationsModal').style.display = 'none');
-    document.getElementById('notificationsModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.target.style.display = 'none'; });
+    notificationsBtn.addEventListener('click', showNotificationsList);
+    notificationsCloseBtn.addEventListener('click', () => notificationsModal.style.display = 'none');
+    notificationsModal.addEventListener('click', e => { if (e.target === e.currentTarget) e.target.style.display = 'none'; });
 }
 
 // ============================================
@@ -2102,22 +2299,6 @@ function initNotifications() {
 
 function initWindowsEditor() {
     console.log('🔧 Инициализация окошек...');
-    
-    const windowsPage = document.getElementById('windowsPage');
-    const windowsPageCloseBtn = document.getElementById('windowsPageCloseBtn');
-    const windowsPageEditBtn = document.getElementById('windowsPageEditBtn');
-    const windowsPageViewBtn = document.getElementById('windowsPageViewBtn');
-    const windowsPageSaveBtn = document.getElementById('windowsPageSaveBtn');
-    const windowsPageResetBtn = document.getElementById('windowsPageResetBtn');
-    const windowsPageAddBgBtn = document.getElementById('windowsPageAddBgBtn');
-    const windowsPageFileInput = document.getElementById('windowsPageFileInput');
-    const windowsPageCanvas = document.getElementById('windowsPageCanvas');
-    const windowsPagePreview = document.getElementById('windowsPagePreview');
-    const windowsPageHint = document.getElementById('windowsPageHint');
-    const windowsPageSpinner = document.getElementById('windowsPageSpinner');
-    const windowsPageBadge = document.getElementById('windowsPageBadge');
-    const windowsPageFooterText = document.getElementById('windowsPageFooterText');
-    const windowsPageContainer = document.getElementById('windowsPageContainer');
     
     const windowsState = {
         mode: 'view',
@@ -2138,8 +2319,7 @@ function initWindowsEditor() {
     
     const W = 1080;
     const H = 1920;
-    const TIMES = ['09:00', '12:00', '15:00', '18:00 (19:00)'];
-    const WEEKDAYS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const TIMES = TEXTS.windowsTimes;
     let ctx = windowsPageCanvas.getContext('2d');
     let hintTimeout = null;
     
@@ -2149,12 +2329,11 @@ function initWindowsEditor() {
     checkboxContainer.innerHTML = `
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#37474F;cursor:pointer;">
             <input type="checkbox" id="windowsShowWeekends" checked style="width:18px;height:18px;cursor:pointer;">
-            С моими выходными
+            ${TEXTS.titles.weekendsHint}
         </label>
     `;
-    const footer = document.getElementById('windowsPageFooter');
-    if (footer) {
-        footer.parentNode.insertBefore(checkboxContainer, footer);
+    if (windowsPageFooter) {
+        windowsPageFooter.parentNode.insertBefore(checkboxContainer, windowsPageFooter);
     }
     
     const weekendsCheckbox = document.getElementById('windowsShowWeekends');
@@ -2168,7 +2347,6 @@ function initWindowsEditor() {
     
     function loadRecordsForWindows() {
         try {
-            // ✅ ИСПОЛЬЗУЕМ УЖЕ ОТФИЛЬТРОВАННЫЕ ДАННЫЕ
             windowsState.recordsData = recordsData || {};
         } catch (e) {}
     }
@@ -2287,23 +2465,18 @@ function initWindowsEditor() {
             
             for (let r = 0; r < dayRecords.length; r++) {
                 const record = dayRecords[r];
-                
-                // ✅ ПРОПУСКАЕМ ЗАПИСИ "Выходной", если они не принадлежат текущему пользователю
                 if (record.serviceType === 'Выходной' && record.master !== currentUserName) {
                     continue;
                 }
-                
                 for (let t = 0; t < TIMES.length; t++) {
                     let hour = parseInt(TIMES[t].split(':')[0]);
                     if (TIMES[t].includes('(')) {
                         hour = 18;
                     }
                     if (hour >= record.startHour && hour < record.endHour) {
-                        // Если запись "Выходной" - добавляем в weekendSlots
                         if (record.serviceType === 'Выходной') {
                             weekendSlots.add(TIMES[t]);
                         } else {
-                            // Обычная запись - всегда зачеркиваем
                             booked.add(TIMES[t]);
                         }
                     }
@@ -2313,15 +2486,12 @@ function initWindowsEditor() {
             const timeParts = [];
             for (let t = 0; t < TIMES.length; t++) {
                 let shouldStrike = booked.has(TIMES[t]) || isPastDay;
-                
-                // ✅ ЗАЧЕРКИВАЕМ "Выходной" ТОЛЬКО если галочка активна
                 if (showWeekends && weekendSlots.has(TIMES[t])) {
                     shouldStrike = true;
                 }
-                
                 timeParts.push(shouldStrike ? '~~' + TIMES[t] + '~~' : TIMES[t]);
             }
-            lines.push(ds + '(' + WEEKDAYS[date.getDay()] + ') - ' + timeParts.join(', '));
+            lines.push(ds + '(' + TEXTS.weekdays[date.getDay()] + ') - ' + timeParts.join(', '));
         }
         return lines;
     }
@@ -2335,7 +2505,7 @@ function initWindowsEditor() {
             const date = new Date(year, month - 1, d);
             const ds = String(d).padStart(2, '0') + '.' + String(month).padStart(2, '0');
             const timeParts = TIMES.map(function(t) { return t; });
-            lines.push(ds + '(' + WEEKDAYS[date.getDay()] + ') - ' + timeParts.join(', '));
+            lines.push(ds + '(' + TEXTS.weekdays[date.getDay()] + ') - ' + timeParts.join(', '));
         }
         return lines;
     }
@@ -2512,13 +2682,13 @@ function initWindowsEditor() {
         ctx.font = '40px Montserrat, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('📷 Нет шаблона', W/2, H/2 - 40);
+        ctx.fillText(TEXTS.titles.noTemplate, W/2, H/2 - 40);
         ctx.font = '24px Montserrat, sans-serif';
-        ctx.fillText('Нажмите ✏️ для редактирования', W/2, H/2 + 40);
+        ctx.fillText(TEXTS.titles.editTemplate, W/2, H/2 + 40);
         if (windowsState.mode === 'edit') {
             ctx.fillStyle = '#008080';
             ctx.font = '20px Montserrat, sans-serif';
-            ctx.fillText('и добавьте подложку', W/2, H/2 + 80);
+            ctx.fillText(TEXTS.titles.addBackground, W/2, H/2 + 80);
         }
     }
     
@@ -2720,29 +2890,29 @@ function initWindowsEditor() {
                     autoFitWidthForWindows();
                     generatePreviewImageForWindows();
                     renderForWindows();
-                    showToastForWindows('✅ Подложка добавлена');
+                    showToastForWindows(TEXTS.messages.bgAdded);
                 };
                 cached.onerror = function() {
                     windowsState.cachedImage = null;
                     renderForWindows();
-                    showToastForWindows('⚠️ Ошибка загрузки подложки', 'error');
+                    showToastForWindows(TEXTS.messages.bgLoadError, 'error');
                 };
                 cached.src = compressedDataUrl;
             };
             img.onerror = function() {
-                showToastForWindows('❌ Не удалось загрузить изображение', 'error');
+                showToastForWindows(TEXTS.messages.bgLoadFailed, 'error');
             };
             img.src = event.target.result;
         };
         reader.onerror = function() {
-            showToastForWindows('❌ Ошибка чтения файла', 'error');
+            showToastForWindows(TEXTS.messages.fileReadError, 'error');
         };
         reader.readAsDataURL(file);
     }
     
     function saveTemplateForWindows() {
         if (!windowsState.background) {
-            showToastForWindows('⚠️ Сначала добавьте подложку', 'error');
+            showToastForWindows(TEXTS.messages.noTemplateWarning, 'error');
             return;
         }
         const key = 'windowsTemplate_' + currentYear + '-' + String(currentMonth).padStart(2, '0');
@@ -2752,7 +2922,7 @@ function initWindowsEditor() {
         }));
         windowsState.hasChanges = false;
         generatePreviewImageForWindows();
-        showToastForWindows('✅ Шаблон сохранен для ' + currentYear + '-' + String(currentMonth).padStart(2, '0'));
+        showToastForWindows(TEXTS.messages.templateSaved);
     }
     
     function resetAllForWindows() {
@@ -2772,7 +2942,7 @@ function initWindowsEditor() {
         const key = 'windowsTemplate_' + currentYear + '-' + String(currentMonth).padStart(2, '0');
         localStorage.removeItem(key);
         renderForWindows();
-        showToastForWindows('↺ Шаблон сброшен');
+        showToastForWindows(TEXTS.messages.templateReset);
     }
     
     function showHintForWindows() {
@@ -2815,7 +2985,7 @@ function initWindowsEditor() {
     function setModeForWindows(mode) {
         windowsState.mode = mode;
         if (mode === 'view') {
-            windowsPageBadge.textContent = '👁️ Просмотр';
+            windowsPageBadge.textContent = TEXTS.titles.viewMode;
             windowsPageBadge.className = 'mode-badge view';
             windowsPageFooterText.textContent = '👁️ Просмотр · Нажмите ✏️ для редактирования';
             windowsPageEditBtn.style.display = 'inline-block';
@@ -2837,7 +3007,7 @@ function initWindowsEditor() {
                 hideHintForWindows();
             }
         } else {
-            windowsPageBadge.textContent = '✏️ Редактирование';
+            windowsPageBadge.textContent = TEXTS.titles.editMode;
             windowsPageBadge.className = 'mode-badge';
             windowsPageFooterText.textContent = '✏️ Редактирование · Перетаскивайте блок за текст';
             windowsPageEditBtn.style.display = 'none';
@@ -2893,7 +3063,7 @@ function initWindowsEditor() {
     
     // === Инициализация ===
     function init() {
-        document.getElementById('windowsBtn').addEventListener('click', function() {
+        windowsBtn.addEventListener('click', function() {
             localStorage.setItem('recordsData', JSON.stringify(recordsData));
             openWindowsPage();
         });

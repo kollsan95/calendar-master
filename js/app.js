@@ -42,7 +42,8 @@ const DEFAULT_CONFIRM_TEMPLATE = `{{Имя клиента}}, добрый ден
 const STORAGE_KEYS = {
     TEMPLATE_PREFIX: 'windowsTemplate_',
     CLEANUP_DAYS: 'cleanupDays',
-    LAST_CLEANUP: 'lastCleanup'
+    LAST_CLEANUP: 'lastCleanup',
+    ADMIN_MODE: 'adminMode'
 };
 
 // === ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ===
@@ -81,6 +82,41 @@ function checkAuth() {
         return false;
     }
     return true;
+}
+
+// ============================================
+//  НАСТРОЙКА АДМИН
+// ============================================
+
+function isAdminMode() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.ADMIN_MODE);
+        return saved === 'true';
+    } catch { return false; }
+}
+
+function setAdminMode(enabled) {
+    localStorage.setItem(STORAGE_KEYS.ADMIN_MODE, String(enabled));
+}
+
+function toggleAdminMode() {
+    const newValue = !isAdminMode();
+    setAdminMode(newValue);
+    updateAdminSliderUI();
+    showToast(newValue ? '👑 Режим администратора включен' : '👑 Режим администратора выключен');
+}
+
+function updateAdminSliderUI() {
+    const checkbox = document.getElementById('settingsAdminMode');
+    const slider = document.getElementById('adminSlider');
+    const dot = document.getElementById('adminSliderDot');
+    
+    if (!checkbox || !slider || !dot) return;
+    
+    const isEnabled = isAdminMode();
+    checkbox.checked = isEnabled;
+    slider.style.background = isEnabled ? '#008080' : '#ccc';
+    dot.style.transform = isEnabled ? 'translateX(22px)' : 'translateX(0)';
 }
 
 // ============================================
@@ -1107,6 +1143,21 @@ function openSettings() {
     renderCleanupSettings();
     renderLogoutButton();
     
+    // ✅ ИНИЦИАЛИЗИРУЕМ АДМИН-ПЕРЕКЛЮЧАТЕЛЬ
+    updateAdminSliderUI();
+    
+    const adminCheckbox = document.getElementById('settingsAdminMode');
+    if (adminCheckbox) {
+        // Удаляем старые обработчики
+        const newCheckbox = adminCheckbox.cloneNode(true);
+        adminCheckbox.parentNode.replaceChild(newCheckbox, adminCheckbox);
+        newCheckbox.addEventListener('change', function() {
+            toggleAdminMode();
+            // Обновляем UI после переключения
+            updateAdminSliderUI();
+        });
+    }
+    
     const editBtn = document.getElementById('settingsTemplateEdit');
     if (editBtn) {
         const newBtn = editBtn.cloneNode(true);
@@ -1639,7 +1690,7 @@ const Detail = {
         }
     },
     
-    updateRecordsList: function(day, month, year) {
+    updateRecordsList = function(day, month, year) {
         const dateKey = year + '-' + String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
         let dayRecords = recordsData[dateKey] || [];
         if (!Array.isArray(dayRecords)) {
@@ -1655,37 +1706,39 @@ const Detail = {
         }
         dayRecords.sort((a,b) => a.startHour - b.startHour);
         dayRecords.forEach(record => {
-            // Проверяем по полю "master", а не по userId
             const isOwn = currentUserName && record.master === currentUserName;
-            const color = isOwn ? (COLORS[record.serviceType] || '#008080') : GRAY;
-            const borderColor = isOwn ? color : GRAY;
-            const bgColor = isOwn ? color + '30' : GRAY + '20';
+            // ✅ ЕСЛИ АДМИН - ВСЕ ЗАПИСИ ОТКРЫВАЮТСЯ В РЕЖИМЕ РЕДАКТИРОВАНИЯ
+            const isAdmin = isAdminMode();
+            const canEdit = isOwn || isAdmin;
+            
+            const color = canEdit ? (COLORS[record.serviceType] || '#008080') : GRAY;
+            const borderColor = canEdit ? color : GRAY;
+            const bgColor = canEdit ? color + '30' : GRAY + '20';
             const li = document.createElement('li');
             li.style.cssText = `padding:8px 12px;margin-bottom:4px;background:${bgColor};border-radius:8px;cursor:pointer;transition:background 0.2s;border-left:4px solid ${borderColor};`;
             const start = String(record.startHour).padStart(2,'0') + ':00';
             const end = String(record.endHour).padStart(2,'0') + ':00';
             let info = '<strong>' + start + ' — ' + end + '</strong>';
-            info += ' <span style="color:' + (isOwn ? '#008080' : '#7B8D8E') + ';font-weight:500;margin-left:6px;">' + record.serviceType + '</span>';
-            if (isOwn && record.serviceType !== 'Выходной') {
+            info += ' <span style="color:' + (canEdit ? '#008080' : '#7B8D8E') + ';font-weight:500;margin-left:6px;">' + record.serviceType + '</span>';
+            if (canEdit && record.serviceType !== 'Выходной') {
                 if (record.clientName) info += ' <span style="margin-left:8px;font-size:12px;color:#37474F;">' + record.clientName + '</span>';
                 if (record.clientPhone) info += ' <span style="margin-left:8px;font-size:12px;color:#7B8D8E;">' + record.clientPhone + '</span>';
             }
             if (record.master) {
                 info += ' <span style="margin-left:8px;font-size:11px;color:#7B8D8E;">👤 ' + record.master + '</span>';
             }
-            if (isOwn && record.note) info += '<br><span style="font-size:11px;color:#7B8D8E;margin-left:6px;">📝 ' + record.note + '</span>';
+            if (canEdit && record.note) info += '<br><span style="font-size:11px;color:#7B8D8E;margin-left:6px;">📝 ' + record.note + '</span>';
             li.innerHTML = info;
             li.addEventListener('click', () => {
-                if (isOwn) {
-                    // Редактирование своей записи
+                // ✅ АДМИН МОЖЕТ РЕДАКТИРОВАТЬ ЛЮБЫЕ ЗАПИСИ
+                if (canEdit) {
                     openModal(day, month, year, null, record.id, false);
                 } else {
-                    // Просмотр чужой записи
                     openModal(day, month, year, null, record.id, true);
                 }
             });
-            li.addEventListener('mouseenter', function() { this.style.background = isOwn ? color + '50' : GRAY + '30'; });
-            li.addEventListener('mouseleave', function() { this.style.background = isOwn ? color + '30' : GRAY + '20'; });
+            li.addEventListener('mouseenter', function() { this.style.background = canEdit ? color + '50' : GRAY + '30'; });
+            li.addEventListener('mouseleave', function() { this.style.background = canEdit ? color + '30' : GRAY + '20'; });
             list.appendChild(li);
         });
     }
@@ -1880,12 +1933,14 @@ function initDetailCanvas() {
         const user = getCurrentUser();
         const currentUserName = user ? user.name : null;
         
-        // Проверяем, есть ли запись на этом часе
         const existingRecord = getRecordAtHour(dateKey, hour);
         if (existingRecord) {
-            // Проверяем по полю "master", а не по userId
             const isOwn = currentUserName && existingRecord.master === currentUserName;
-            if (isOwn) {
+            // ✅ АДМИН МОЖЕТ РЕДАКТИРОВАТЬ ЛЮБЫЕ ЗАПИСИ
+            const isAdmin = isAdminMode();
+            const canEdit = isOwn || isAdmin;
+            
+            if (canEdit) {
                 openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id, false);
             } else {
                 openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id, true);
@@ -1893,7 +1948,6 @@ function initDetailCanvas() {
             return;
         }
         
-        // Проверяем, не занят ли этот час
         const bookedHours = getBookedHours(dateKey);
         if (bookedHours.has(hour)) {
             showToast('⏰ Это время уже занято', 'error');
@@ -1915,6 +1969,7 @@ function initDetailCanvas() {
                 rangeHours = [];
                 Detail.drawDetailTile(Detail.currentDay, currentMonth, currentYear, []);
                 currentModalTab = 'main';
+                // ✅ НОВАЯ ЗАПИСЬ ВСЕГДА ДОБАВЛЯЕТСЯ В РЕЖИМЕ РЕДАКТИРОВАНИЯ
                 openModal(Detail.currentDay, currentMonth, currentYear, { start, end }, null, false);
             }
             singleClickTimeout = null;

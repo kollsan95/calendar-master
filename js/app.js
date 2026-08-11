@@ -516,6 +516,9 @@ async function loadMastersList() {
         }
         
         if (modalMasterName) {
+            // Сохраняем текущее значение
+            const currentValue = modalMasterName.value;
+            
             modalMasterName.innerHTML = '';
             masters.forEach(m => {
                 const option = document.createElement('option');
@@ -525,6 +528,26 @@ async function loadMastersList() {
                 option.dataset.userId = m.id;
                 modalMasterName.appendChild(option);
             });
+            
+            // Восстанавливаем значение, если оно было
+            if (currentValue) {
+                let found = false;
+                for (let i = 0; i < modalMasterName.options.length; i++) {
+                    if (modalMasterName.options[i].value === currentValue) {
+                        modalMasterName.selectedIndex = i;
+                        found = true;
+                        break;
+                    }
+                }
+                // Если значение не найдено, добавляем его
+                if (!found && currentValue) {
+                    const option = document.createElement('option');
+                    option.value = currentValue;
+                    option.textContent = currentValue;
+                    modalMasterName.appendChild(option);
+                    modalMasterName.value = currentValue;
+                }
+            }
         }
         return masters;
     } catch (error) {
@@ -1214,7 +1237,31 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         modalClientName.value = record.clientName || '';
         modalClientPhone.value = record.clientPhone || '';
         modalNote.value = record.note || '';
-        modalMasterName.value = record.master || '';
+        
+        // ✅ ПРАВИЛЬНОЕ ЗАПОЛНЕНИЕ ПОЛЯ МАСТЕР
+        const masterName = record.master || '';
+        // Пытаемся установить значение из записи
+        if (masterName) {
+            // Проверяем, есть ли такое значение в списке
+            let found = false;
+            for (let i = 0; i < modalMasterName.options.length; i++) {
+                if (modalMasterName.options[i].value === masterName) {
+                    modalMasterName.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            // Если нет в списке - добавляем как новый вариант
+            if (!found) {
+                const option = document.createElement('option');
+                option.value = masterName;
+                option.textContent = masterName;
+                modalMasterName.appendChild(option);
+                modalMasterName.value = masterName;
+            }
+        } else {
+            modalMasterName.value = '';
+        }
         
         modalOverlay.dataset.deleteId = String(record.id);
         modalOverlay.dataset.deleteDate = record.date;

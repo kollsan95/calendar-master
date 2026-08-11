@@ -1854,7 +1854,7 @@ const Detail = {
                 const radius = size/2 - 6, innerRadius = radius * INNER_RADIUS_RATIO;
                 ctx.clearRect(0, 0, size, size);
                 
-                // 1. Внешний круг
+                // Внешний круг
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI*2);
                 ctx.fillStyle = isPast ? '#F5F5F5' : '#FFFDF9';
@@ -1869,25 +1869,57 @@ const Detail = {
                     dayRecords = Object.values(dayRecords);
                 }
                 
-                // 2. РИСУЕМ СЕКТОРЫ
+                // Создаем массив занятости с recordId
+                const hourState = [];
                 for (let i = 0; i < 12; i++) {
                     const hour = 9 + i;
-                    const angleStart = Math.PI + i * (Math.PI*2 / 12);
-                    const angleEnd = Math.PI + (i + 1) * (Math.PI*2 / 12);
                     let isBooked = false, color = getUIColor('Чужие записи'), isOwn = false;
+                    let recordId = null;
                     for (const r of dayRecords) {
                         if (hour >= r.startHour && hour < r.endHour) {
                             isBooked = true;
                             isOwn = currentUserName && r.master === currentUserName;
                             color = isOwn ? getServiceColor(r.serviceType) : getUIColor('Чужие записи');
+                            recordId = r.id;
                             break;
                         }
                     }
+                    hourState.push({ hour, isBooked, color, isOwn, recordId });
+                }
+                
+                // Рисуем секторы
+                for (let i = 0; i < 12; i++) {
+                    const hour = 9 + i;
+                    const angleStart = Math.PI + i * (Math.PI*2 / 12);
+                    const angleEnd = Math.PI + (i + 1) * (Math.PI*2 / 12);
+                    const state = hourState[i];
+                    const isBooked = state.isBooked;
+                    const color = state.color;
+                    const isOwn = state.isOwn;
+                    
+                    let drawLeftBorder = false;
+                    let drawRightBorder = false;
+                    
+                    if (isBooked) {
+                        const prevState = i > 0 ? hourState[i - 1] : null;
+                        const isPrevSameRecord = prevState && 
+                                                prevState.isBooked && 
+                                                prevState.recordId === state.recordId;
+                        const nextState = i < 11 ? hourState[i + 1] : null;
+                        const isNextSameRecord = nextState && 
+                                                nextState.isBooked && 
+                                                nextState.recordId === state.recordId;
+                        
+                        drawLeftBorder = !isPrevSameRecord;
+                        drawRightBorder = !isNextSameRecord;
+                    }
+                    
                     ctx.beginPath();
                     ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
                     ctx.arc(cx, cy, radius, angleStart, angleEnd);
                     ctx.arc(cx, cy, innerRadius, angleEnd, angleStart);
                     ctx.closePath();
+                    
                     if (isBooked) {
                         const fillColor = isOwn ? color : getUIColor('Чужие записи');
                         const strokeColor = isOwn ? color : getUIColor('Чужие записи');
@@ -1896,6 +1928,26 @@ const Detail = {
                         ctx.strokeStyle = isPast ? color : strokeColor;
                         ctx.lineWidth = 1.5;
                         ctx.stroke();
+                        
+                        // Левая граница: БЕЛАЯ если первый сектор записи
+                        if (drawLeftBorder) {
+                            ctx.beginPath();
+                            ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
+                            ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
+                            ctx.strokeStyle = '#FFFFFF';
+                            ctx.lineWidth = 1.5;
+                            ctx.stroke();
+                        }
+                        
+                        // Правая граница: БЕЛАЯ если последний сектор записи
+                        if (drawRightBorder) {
+                            ctx.beginPath();
+                            ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
+                            ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
+                            ctx.strokeStyle = '#FFFFFF';
+                            ctx.lineWidth = 1.5;
+                            ctx.stroke();
+                        }
                     } else {
                         ctx.fillStyle = 'transparent';
                         ctx.fill();
@@ -1905,7 +1957,7 @@ const Detail = {
                     }
                 }
                 
-                // 3. ВНУТРЕННИЙ КРУГ ПОВЕРХ СЕКТОРОВ (ВСЕГДА БЕЛЫЙ)
+                // Внутренний круг
                 ctx.beginPath();
                 ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
                 ctx.fillStyle = '#FFFFFF';
@@ -1914,7 +1966,7 @@ const Detail = {
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
                 
-                // 4. ЦИФРА ДНЯ ПОВЕРХ БЕЛОГО КРУГА
+                // Цифра дня
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = isPast ? '#A0A0A0' : '#37474F';
@@ -1962,21 +2014,23 @@ const Detail = {
         const currentUserName = user ? user.name : null;
         const isPast = isDayPast(year, month, day);
         
-        // Создаем массив занятости по часам
+        // Создаем массив занятости с recordId
         const hourState = [];
         for (let i = 0; i < 12; i++) {
             const hour = 9 + i;
             let isBooked = false, color = getUIColor('Чужие записи'), serviceType = '', isOwn = false;
+            let recordId = null;
             for (const r of dayRecords) {
                 if (hour >= r.startHour && hour < r.endHour) {
                     isBooked = true;
                     serviceType = r.serviceType;
                     isOwn = currentUserName && r.master === currentUserName;
                     color = isOwn ? getServiceColor(serviceType) : getUIColor('Чужие записи');
+                    recordId = r.id;
                     break;
                 }
             }
-            hourState.push({ hour, isBooked, color, serviceType, isOwn });
+            hourState.push({ hour, isBooked, color, serviceType, isOwn, recordId });
         }
         
         // Рисуем секторы
@@ -1995,12 +2049,16 @@ const Detail = {
             
             if (isBooked) {
                 const prevState = i > 0 ? hourState[i - 1] : null;
-                const isPrevBooked = prevState && prevState.isBooked && prevState.serviceType === state.serviceType && prevState.isOwn === state.isOwn;
+                const isPrevSameRecord = prevState && 
+                                        prevState.isBooked && 
+                                        prevState.recordId === state.recordId;
                 const nextState = i < 11 ? hourState[i + 1] : null;
-                const isNextBooked = nextState && nextState.isBooked && nextState.serviceType === state.serviceType && nextState.isOwn === state.isOwn;
+                const isNextSameRecord = nextState && 
+                                        nextState.isBooked && 
+                                        nextState.recordId === state.recordId;
                 
-                drawLeftBorder = !isPrevBooked;
-                drawRightBorder = !isNextBooked;
+                drawLeftBorder = !isPrevSameRecord;
+                drawRightBorder = !isNextSameRecord;
             }
             
             ctx.beginPath();
@@ -2011,41 +2069,32 @@ const Detail = {
             
             if (isBooked) {
                 const fillColor = isOwn ? color : getUIColor('Чужие записи');
+                const strokeColor = isOwn ? color : getUIColor('Чужие записи');
                 ctx.fillStyle = isPast ? color : fillColor;
                 ctx.fill();
-                
-                const strokeColor = isOwn ? color : getUIColor('Чужие записи');
-                const actualColor = strokeColor;
-                
-                // Внешняя граница
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius, angleStart, angleEnd);
-                ctx.strokeStyle = isHighlighted ? '#008080' : actualColor;
+                ctx.strokeStyle = isHighlighted ? '#008080' : (isPast ? color : strokeColor);
                 ctx.lineWidth = isHighlighted ? 4 : 2.5;
                 ctx.stroke();
                 
-                // Внутренняя граница
-                ctx.beginPath();
-                ctx.arc(cx, cy, innerRadius, angleStart, angleEnd);
-                ctx.strokeStyle = isHighlighted ? '#008080' : actualColor;
-                ctx.lineWidth = isHighlighted ? 4 : 2.5;
-                ctx.stroke();
+                // Левая граница: БЕЛАЯ если первый сектор записи
+                if (drawLeftBorder) {
+                    ctx.beginPath();
+                    ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
+                    ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = isHighlighted ? 4 : 2.5;
+                    ctx.stroke();
+                }
                 
-                // Левая граница
-                ctx.beginPath();
-                ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
-                ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
-                ctx.strokeStyle = drawLeftBorder ? actualColor : '#FFFFFF';
-                ctx.lineWidth = isHighlighted ? 4 : 2.5;
-                ctx.stroke();
-                
-                // Правая граница
-                ctx.beginPath();
-                ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
-                ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
-                ctx.strokeStyle = drawRightBorder ? actualColor : '#FFFFFF';
-                ctx.lineWidth = isHighlighted ? 4 : 2.5;
-                ctx.stroke();
+                // Правая граница: БЕЛАЯ если последний сектор записи
+                if (drawRightBorder) {
+                    ctx.beginPath();
+                    ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
+                    ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = isHighlighted ? 4 : 2.5;
+                    ctx.stroke();
+                }
                 
             } else if (isHighlighted) {
                 ctx.fillStyle = 'rgba(0,128,128,0.15)';

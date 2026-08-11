@@ -1814,22 +1814,13 @@ const Detail = {
         const innerRadius = radius * INNER_RADIUS_RATIO;
         ctx.clearRect(0, 0, size, size);
         
-        // Внешний круг
+        // 1. Внешний круг
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI*2);
         ctx.fillStyle = '#FFFDF9';
         ctx.fill();
         ctx.strokeStyle = '#E0F2F1';
         ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // ВНУТРЕННИЙ КРУГ ВСЕГДА БЕЛЫЙ (в детальном режиме)
-        ctx.beginPath();
-        ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fill();
-        ctx.strokeStyle = '#E0F2F1';
-        ctx.lineWidth = 1;
         ctx.stroke();
         
         const dateKey = year + '-' + String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
@@ -1841,6 +1832,7 @@ const Detail = {
         const currentUserName = user ? user.name : null;
         const isPast = isDayPast(year, month, day);
         
+        // 2. РИСУЕМ СЕКТОРЫ
         for (let i = 0; i < 12; i++) {
             const hour = 9 + i;
             const angleStart = Math.PI + i * (Math.PI*2 / 12);
@@ -1862,7 +1854,6 @@ const Detail = {
             ctx.arc(cx, cy, innerRadius, angleEnd, angleStart);
             ctx.closePath();
             if (isBooked) {
-                // ✅ СПЛОШНОЙ ЦВЕТ
                 const fillColor = isOwn ? color : getUIColor('Чужие записи');
                 const strokeColor = isOwn ? color : getUIColor('Чужие записи');
                 ctx.fillStyle = isPast ? color : fillColor;
@@ -1884,6 +1875,17 @@ const Detail = {
                 ctx.stroke();
             }
         }
+        
+        // 3. ВНУТРЕННИЙ КРУГ ПОВЕРХ СЕКТОРОВ (ВСЕГДА БЕЛЫЙ)
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+        ctx.strokeStyle = '#E0F2F1';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // 4. ЧАСЫ ВОКРУГ (оставляем как есть)
         const labelRadius = radius + 28;
         for (let i = 0; i < 12; i++) {
             const hour = 9 + i;

@@ -1690,7 +1690,7 @@ const Detail = {
         }
     },
     
-    updateRecordsList = function(day, month, year) {
+    updateRecordsList: function(day, month, year) {
         const dateKey = year + '-' + String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
         let dayRecords = recordsData[dateKey] || [];
         if (!Array.isArray(dayRecords)) {

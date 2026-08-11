@@ -840,21 +840,23 @@ function drawTile(canvas, day, isPast) {
     const user = getCurrentUser();
     const currentUserName = user ? user.name : null;
     
-    // Создаем массив занятости по часам
+    // Создаем массив занятости по часам с recordId
     const hourState = [];
     for (let i = 0; i < 12; i++) {
         const hour = 9 + i;
         let isBooked = false, color = getUIColor('Чужие записи'), serviceType = '', isOwn = false;
+        let recordId = null;
         for (const r of dayRecords) {
             if (hour >= r.startHour && hour < r.endHour) {
                 isBooked = true;
                 serviceType = r.serviceType;
                 isOwn = currentUserName && r.master === currentUserName;
                 color = isOwn ? getServiceColor(serviceType) : getUIColor('Чужие записи');
+                recordId = r.id; // ✅ ЗАПОМИНАЕМ ID ЗАПИСИ
                 break;
             }
         }
-        hourState.push({ hour, isBooked, color, serviceType, isOwn });
+        hourState.push({ hour, isBooked, color, serviceType, isOwn, recordId });
     }
     
     // Рисуем секторы
@@ -869,20 +871,23 @@ function drawTile(canvas, day, isPast) {
         const shouldBeGray = isBooked && filterType !== 'all' && state.serviceType !== filterType;
         const isFree = !isBooked && isFreeMode;
         
-        // Определяем границы
         let drawLeftBorder = false;
         let drawRightBorder = false;
         
         if (isBooked) {
             const prevState = i > 0 ? hourState[i - 1] : null;
-            const isPrevBooked = prevState && prevState.isBooked && prevState.serviceType === state.serviceType && prevState.isOwn === state.isOwn;
-            const nextState = i < 11 ? hourState[i + 1] : null;
-            const isNextBooked = nextState && nextState.isBooked && nextState.serviceType === state.serviceType && nextState.isOwn === state.isOwn;
+            // ✅ СРАВНИВАЕМ ПО ID ЗАПИСИ
+            const isPrevSameRecord = prevState && 
+                                     prevState.isBooked && 
+                                     prevState.recordId === state.recordId;
             
-            // Левая граница: рисуем БЕЛУЮ, если слева НЕТ такой же записи
-            drawLeftBorder = !isPrevBooked;
-            // Правая граница: рисуем БЕЛУЮ, если справа НЕТ такой же записи
-            drawRightBorder = !isNextBooked;
+            const nextState = i < 11 ? hourState[i + 1] : null;
+            const isNextSameRecord = nextState && 
+                                     nextState.isBooked && 
+                                     nextState.recordId === state.recordId;
+            
+            drawLeftBorder = !isPrevSameRecord;
+            drawRightBorder = !isNextSameRecord;
         }
         
         ctx.beginPath();
@@ -899,7 +904,7 @@ function drawTile(canvas, day, isPast) {
             const strokeColor = isOwn ? color : getUIColor('Чужие записи');
             const actualColor = shouldBeGray ? getUIColor('Чужие записи') : strokeColor;
             
-            // Внешняя граница (снаружи)
+            // Внешняя граница
             ctx.beginPath();
             ctx.arc(cx, cy, radius, angleStart, angleEnd);
             ctx.strokeStyle = actualColor;
@@ -913,7 +918,7 @@ function drawTile(canvas, day, isPast) {
             ctx.lineWidth = 2.5;
             ctx.stroke();
             
-            // Левая граница: БЕЛАЯ если рисуем, иначе НЕ РИСУЕМ
+            // Левая граница: БЕЛАЯ если первый сектор записи
             if (drawLeftBorder) {
                 ctx.beginPath();
                 ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
@@ -923,7 +928,7 @@ function drawTile(canvas, day, isPast) {
                 ctx.stroke();
             }
             
-            // Правая граница: БЕЛАЯ если рисуем, иначе НЕ РИСУЕМ
+            // Правая граница: БЕЛАЯ если последний сектор записи
             if (drawRightBorder) {
                 ctx.beginPath();
                 ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
@@ -948,7 +953,7 @@ function drawTile(canvas, day, isPast) {
         }
     }
     
-    // Внутренний круг поверх секторов
+    // Внутренний круг
     ctx.beginPath();
     ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
     ctx.fillStyle = '#FFFFFF';

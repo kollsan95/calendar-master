@@ -869,7 +869,7 @@ function drawTile(canvas, day, isPast) {
         const shouldBeGray = isBooked && filterType !== 'all' && state.serviceType !== filterType;
         const isFree = !isBooked && isFreeMode;
         
-        // Определяем, нужно ли рисовать границы
+        // Определяем границы
         let drawLeftBorder = false;
         let drawRightBorder = false;
         
@@ -879,9 +879,9 @@ function drawTile(canvas, day, isPast) {
             const nextState = i < 11 ? hourState[i + 1] : null;
             const isNextBooked = nextState && nextState.isBooked && nextState.serviceType === state.serviceType && nextState.isOwn === state.isOwn;
             
-            // ✅ ЛЕВАЯ ГРАНИЦА: рисуем ТОЛЬКО если предыдущий НЕ занят той же записью
+            // Левая граница: рисуем БЕЛУЮ, если слева НЕТ такой же записи
             drawLeftBorder = !isPrevBooked;
-            // ✅ ПРАВАЯ ГРАНИЦА: рисуем ТОЛЬКО если следующий НЕ занят той же записью
+            // Правая граница: рисуем БЕЛУЮ, если справа НЕТ такой же записи
             drawRightBorder = !isNextBooked;
         }
         
@@ -913,21 +913,25 @@ function drawTile(canvas, day, isPast) {
             ctx.lineWidth = 2.5;
             ctx.stroke();
             
-            // ✅ ЛЕВАЯ ГРАНИЦА: цветная если первый сектор, иначе белая
-            ctx.beginPath();
-            ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
-            ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
-            ctx.strokeStyle = drawLeftBorder ? actualColor : '#FFFFFF';
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
+            // Левая граница: БЕЛАЯ если рисуем, иначе НЕ РИСУЕМ
+            if (drawLeftBorder) {
+                ctx.beginPath();
+                ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
+                ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+            }
             
-            // ✅ ПРАВАЯ ГРАНИЦА: цветная если последний сектор, иначе белая
-            ctx.beginPath();
-            ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
-            ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
-            ctx.strokeStyle = drawRightBorder ? actualColor : '#FFFFFF';
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
+            // Правая граница: БЕЛАЯ если рисуем, иначе НЕ РИСУЕМ
+            if (drawRightBorder) {
+                ctx.beginPath();
+                ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
+                ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+            }
             
         } else if (isFree && !isPast) {
             ctx.fillStyle = getUIColor('Свободные слоты');

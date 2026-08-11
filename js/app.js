@@ -812,22 +812,13 @@ function drawTile(canvas, day, isPast) {
     const radius = size/2 - 6, innerRadius = radius * INNER_RADIUS_RATIO;
     ctx.clearRect(0, 0, size, size);
     
-    // Внешний круг (фон)
+    // 1. Внешний круг (фон)
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI*2);
     ctx.fillStyle = isPast ? '#F0F0F0' : '#FFFDF9';
     ctx.fill();
     ctx.strokeStyle = '#E0F2F1';
     ctx.lineWidth = 1;
-    ctx.stroke();
-    
-    // ВНУТРЕННИЙ КРУГ ВСЕГДА БЕЛЫЙ
-    ctx.beginPath();
-    ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fill();
-    ctx.strokeStyle = '#E0F2F1';
-    ctx.lineWidth = 0.5;
     ctx.stroke();
     
     const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(day).padStart(2,'0');
@@ -849,6 +840,7 @@ function drawTile(canvas, day, isPast) {
     const user = getCurrentUser();
     const currentUserName = user ? user.name : null;
     
+    // 2. РИСУЕМ СЕКТОРЫ
     for (let i = 0; i < 12; i++) {
         const hour = 9 + i;
         const angleStart = Math.PI + i * (Math.PI*2 / 12);
@@ -873,7 +865,6 @@ function drawTile(canvas, day, isPast) {
         ctx.closePath();
         
         if (isBooked) {
-            // ✅ СПЛОШНОЙ ЦВЕТ, БЕЗ ПРОЗРАЧНОСТИ
             const fillColor = isOwn ? color : getUIColor('Чужие записи');
             const strokeColor = isOwn ? color : getUIColor('Чужие записи');
             ctx.fillStyle = shouldBeGray ? getUIColor('Чужие записи') : fillColor;
@@ -896,7 +887,16 @@ function drawTile(canvas, day, isPast) {
         }
     }
     
-    // ЦИФРА ДНЯ ВСЕГДА ЧЕРНАЯ
+    // 3. ВНУТРЕННИЙ КРУГ ПОВЕРХ СЕКТОРОВ (ВСЕГДА БЕЛЫЙ)
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.strokeStyle = '#E0F2F1';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    
+    // 4. ЦИФРА ДНЯ ПОВЕРХ БЕЛОГО КРУГА
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = isPast ? '#A0A0A0' : '#37474F';
@@ -1728,19 +1728,14 @@ const Detail = {
                 const size = canvas.width, cx = size/2, cy = size/2;
                 const radius = size/2 - 6, innerRadius = radius * INNER_RADIUS_RATIO;
                 ctx.clearRect(0, 0, size, size);
+                
+                // 1. Внешний круг
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI*2);
                 ctx.fillStyle = isPast ? '#F5F5F5' : '#FFFDF9';
                 ctx.fill();
                 ctx.strokeStyle = '#E0F2F1';
                 ctx.lineWidth = 1;
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
-                ctx.fillStyle = '#FFFDF9';
-                ctx.fill();
-                ctx.strokeStyle = '#E0F2F1';
-                ctx.lineWidth = 0.5;
                 ctx.stroke();
                 
                 const dateKey = y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
@@ -1749,6 +1744,7 @@ const Detail = {
                     dayRecords = Object.values(dayRecords);
                 }
                 
+                // 2. РИСУЕМ СЕКТОРЫ
                 for (let i = 0; i < 12; i++) {
                     const hour = 9 + i;
                     const angleStart = Math.PI + i * (Math.PI*2 / 12);
@@ -1768,11 +1764,11 @@ const Detail = {
                     ctx.arc(cx, cy, innerRadius, angleEnd, angleStart);
                     ctx.closePath();
                     if (isBooked) {
-                        const fillColor = isOwn ? color + '40' : getUIColor('Чужие записи') + '40';
-                        const strokeColor = isOwn ? (isPast ? color + '60' : color) : getUIColor('Чужие записи');
-                        ctx.fillStyle = isPast ? color + '20' : fillColor;
+                        const fillColor = isOwn ? color : getUIColor('Чужие записи');
+                        const strokeColor = isOwn ? color : getUIColor('Чужие записи');
+                        ctx.fillStyle = isPast ? color : fillColor;
                         ctx.fill();
-                        ctx.strokeStyle = isPast ? color + '60' : strokeColor;
+                        ctx.strokeStyle = isPast ? color : strokeColor;
                         ctx.lineWidth = 1.5;
                         ctx.stroke();
                     } else {
@@ -1783,6 +1779,17 @@ const Detail = {
                         ctx.stroke();
                     }
                 }
+                
+                // 3. ВНУТРЕННИЙ КРУГ ПОВЕРХ СЕКТОРОВ (ВСЕГДА БЕЛЫЙ)
+                ctx.beginPath();
+                ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fill();
+                ctx.strokeStyle = '#E0F2F1';
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+                
+                // 4. ЦИФРА ДНЯ ПОВЕРХ БЕЛОГО КРУГА
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = isPast ? '#A0A0A0' : '#37474F';

@@ -2087,7 +2087,25 @@ function initWindowsEditor() {
     
     function loadRecordsForWindows() {
         try {
-            windowsState.recordsData = recordsData || {};
+            // ✅ КОПИРУЕМ ТОЛЬКО "СВОИ" ЗАПИСИ ДЛЯ ОКОШЕК
+            const user = getCurrentUser();
+            const currentUserName = user ? user.name : null;
+            const filteredData = {};
+            
+            for (const [dateKey, records] of Object.entries(recordsData)) {
+                const filteredRecords = records.filter(r => {
+                    // Если запись "Выходной" - показываем только если мастер = текущий пользователь
+                    if (r.serviceType === 'Выходной') {
+                        return r.master === currentUserName;
+                    }
+                    // Обычные записи показываем все (они будут серыми, если не наши)
+                    return true;
+                });
+                if (filteredRecords.length > 0) {
+                    filteredData[dateKey] = filteredRecords;
+                }
+            }
+            windowsState.recordsData = filteredData;
         } catch (e) {}
     }
     
@@ -2176,6 +2194,8 @@ function initWindowsEditor() {
         const todayHour = now.getHours();
         const lines = [];
         const showWeekends = windowsState.showWeekends;
+        const currentUser = getCurrentUser();
+        const currentUserName = currentUser ? currentUser.name : null;
         
         for (let d = 1; d <= days; d++) {
             const date = new Date(year, month - 1, d);
@@ -2198,34 +2218,29 @@ function initWindowsEditor() {
             }
             
             const booked = new Set();
+            const weekendSlots = new Set();
             const dayRecords = windowsState.recordsData[dateKey] || [];
             
-            // Собираем все занятые слоты (включая "Выходной")
             for (let r = 0; r < dayRecords.length; r++) {
+                const record = dayRecords[r];
+                
+                // ✅ ПРОПУСКАЕМ ЗАПИСИ "Выходной", если они не принадлежат текущему пользователю
+                if (record.serviceType === 'Выходной' && record.master !== currentUserName) {
+                    continue;
+                }
+                
                 for (let t = 0; t < TIMES.length; t++) {
                     let hour = parseInt(TIMES[t].split(':')[0]);
                     if (TIMES[t].includes('(')) {
                         hour = 18;
                     }
-                    if (hour >= dayRecords[r].startHour && hour < dayRecords[r].endHour) {
-                        booked.add(TIMES[t]);
-                    }
-                }
-            }
-            
-            // Собираем слоты, которые являются "Выходными" (для галочки)
-            const weekendSlots = new Set();
-            if (showWeekends) {
-                for (let r = 0; r < dayRecords.length; r++) {
-                    if (dayRecords[r].serviceType === 'Выходной') {
-                        for (let t = 0; t < TIMES.length; t++) {
-                            let hour = parseInt(TIMES[t].split(':')[0]);
-                            if (TIMES[t].includes('(')) {
-                                hour = 18;
-                            }
-                            if (hour >= dayRecords[r].startHour && hour < dayRecords[r].endHour) {
-                                weekendSlots.add(TIMES[t]);
-                            }
+                    if (hour >= record.startHour && hour < record.endHour) {
+                        // Если запись "Выходной" - добавляем в weekendSlots
+                        if (record.serviceType === 'Выходной') {
+                            weekendSlots.add(TIMES[t]);
+                        } else {
+                            // Обычная запись - всегда зачеркиваем
+                            booked.add(TIMES[t]);
                         }
                     }
                 }
@@ -2235,8 +2250,8 @@ function initWindowsEditor() {
             for (let t = 0; t < TIMES.length; t++) {
                 let shouldStrike = booked.has(TIMES[t]) || isPastDay;
                 
-                // Если галочка активна И этот слот является "Выходным" - зачеркиваем
-                if (weekendSlots.has(TIMES[t])) {
+                // ✅ ЗАЧЕРКИВАЕМ "Выходной" ТОЛЬКО если галочка активна
+                if (showWeekends && weekendSlots.has(TIMES[t])) {
                     shouldStrike = true;
                 }
                 

@@ -170,6 +170,33 @@ function saveTemplate(key, text) {
     if (key === 'confirmLetterTemplate') confirmTemplateText = text;
 }
 
+// ============================================
+//  ФИЛЬТРАЦИЯ ЗАПИСЕЙ
+// ============================================
+
+function filterRecordsForUser(records) {
+    const user = getCurrentUser();
+    const currentUserName = user ? user.name : null;
+    
+    if (!records) return {};
+    
+    const result = {};
+    for (const [dateKey, dayRecords] of Object.entries(records)) {
+        const filtered = dayRecords.filter(record => {
+            // Если запись "Выходной" - показываем только если мастер = текущий пользователь
+            if (record.serviceType === 'Выходной') {
+                return record.master === currentUserName;
+            }
+            // Обычные записи показываем всем
+            return true;
+        });
+        if (filtered.length > 0) {
+            result[dateKey] = filtered;
+        }
+    }
+    return result;
+}
+
 // === УТИЛИТЫ ===
 function isDayPast(year, month, day) {
     const now = new Date();
@@ -303,7 +330,8 @@ async function loadRecords() {
     try {
         if (firebaseSync) {
             firebaseSync.syncRecords((data) => {
-                recordsData = data;
+                // ✅ ПРИМЕНЯЕМ ФИЛЬТРАЦИЮ ПРИ ЗАГРУЗКЕ
+                recordsData = filterRecordsForUser(data);
                 renderCalendar();
                 if (document.getElementById('detailContainer').style.display === 'block') {
                     const d = Detail.currentDay, 
@@ -351,13 +379,9 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
         record.id = editingRecordId;
         try {
             await firebaseSync.updateRecord(editingRecordId, date, record);
-            // Обновляем локальные данные
-            if (recordsData[date]) {
-                const idx = recordsData[date].findIndex(r => String(r.id) === String(editingRecordId));
-                if (idx !== -1) {
-                    recordsData[date][idx] = record;
-                }
-            }
+            // Обновляем локальные данные с фильтрацией
+            const allData = await firebaseSync.loadAllRecords();
+            recordsData = filterRecordsForUser(allData);
             addNotification('✏️ Обновлена запись: ' + serviceType + ' на ' + date + ' ' + startHour + ':00');
             sendSystemNotification('Запись обновлена', serviceType + ' на ' + date + ' ' + startHour + ':00');
             renderCalendar();
@@ -382,6 +406,11 @@ async function saveRecord(date, startHour, endHour, serviceType, clientName, cli
         sendSystemNotification('Новая запись', serviceType + ' на ' + date + ' ' + startHour + ':00');
         closeModal();
         showToast('✅ Запись сохранена!');
+        // Обновляем данные с фильтрацией
+        const allData = await firebaseSync.loadAllRecords();
+        recordsData = filterRecordsForUser(allData);
+        renderCalendar();
+        refreshDetail();
         if (openLetter && serviceType !== 'Выходной') {
             setTimeout(() => openModalWithLetter(record), 300);
         }
@@ -396,12 +425,9 @@ async function deleteRecordFromDB(id, dateKey, serviceType) {
     
     try {
         await firebaseSync.deleteRecord(id, dateKey);
-        if (recordsData[dateKey]) {
-            recordsData[dateKey] = recordsData[dateKey].filter(r => String(r.id) !== String(id));
-            if (recordsData[dateKey].length === 0) {
-                delete recordsData[dateKey];
-            }
-        }
+        // Обновляем данные с фильтрацией
+        const allData = await firebaseSync.loadAllRecords();
+        recordsData = filterRecordsForUser(allData);
         addNotification('🗑️ Удалена запись: ' + serviceType);
         sendSystemNotification('Запись удалена', serviceType + ' удалена');
         renderCalendar();
@@ -2087,25 +2113,8 @@ function initWindowsEditor() {
     
     function loadRecordsForWindows() {
         try {
-            // ✅ КОПИРУЕМ ТОЛЬКО "СВОИ" ЗАПИСИ ДЛЯ ОКОШЕК
-            const user = getCurrentUser();
-            const currentUserName = user ? user.name : null;
-            const filteredData = {};
-            
-            for (const [dateKey, records] of Object.entries(recordsData)) {
-                const filteredRecords = records.filter(r => {
-                    // Если запись "Выходной" - показываем только если мастер = текущий пользователь
-                    if (r.serviceType === 'Выходной') {
-                        return r.master === currentUserName;
-                    }
-                    // Обычные записи показываем все (они будут серыми, если не наши)
-                    return true;
-                });
-                if (filteredRecords.length > 0) {
-                    filteredData[dateKey] = filteredRecords;
-                }
-            }
-            windowsState.recordsData = filteredData;
+            // ✅ ИСПОЛЬЗУЕМ УЖЕ ОТФИЛЬТРОВАННЫЕ ДАННЫЕ
+            windowsState.recordsData = recordsData || {};
         } catch (e) {}
     }
     

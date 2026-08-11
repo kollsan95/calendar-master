@@ -439,6 +439,7 @@ async function loadMastersList() {
                 phone: currentUser.phone || ''
             });
         }
+        
         if (modalMasterName) {
             modalMasterName.innerHTML = '';
             masters.forEach(m => {
@@ -448,16 +449,6 @@ async function loadMastersList() {
                 option.dataset.phone = m.phone || '';
                 modalMasterName.appendChild(option);
             });
-            if (currentUser && currentUser.name) {
-                const found = Array.from(modalMasterName.options).find(o => o.value === currentUser.name);
-                if (found) {
-                    modalMasterName.value = currentUser.name;
-                } else if (masters.length > 0) {
-                    modalMasterName.value = masters[0].name;
-                }
-            } else if (masters.length > 0) {
-                modalMasterName.value = masters[0].name;
-            }
         }
         return masters;
     } catch (error) {
@@ -1079,7 +1070,6 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         if (record && record.serviceType === 'Выходной') {
             isDayOff = true;
         }
-        // Передаем флаг readOnly в запись
         if (record) {
             record._readOnly = readOnly;
         }
@@ -1111,7 +1101,7 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         modalClientName.value = record.clientName || '';
         modalClientPhone.value = record.clientPhone || '';
         modalNote.value = record.note || '';
-        modalMasterName.value = record.master || '';
+        modalMasterName.value = record.master || ''; // ✅ УСТАНАВЛИВАЕМ ИЗ ЗАПИСИ
         
         modalOverlay.dataset.deleteId = String(record.id);
         modalOverlay.dataset.deleteDate = record.date;
@@ -1125,7 +1115,7 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         toggleClientFields(record.serviceType);
         updateEndHourOptions(parseInt(modalStartHour.value));
         
-        // ✅ ВЫЗЫВАЕМ ФУНКЦИЮ УПРАВЛЕНИЯ СОСТОЯНИЕМ
+        // Управление состоянием
         updateModalState(record);
         
     } else {
@@ -1140,13 +1130,14 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         toggleClientFields(SERVICE_KEYS[0]);
         updateEndHourOptions(selectedRange ? selectedRange.start : 9);
         
-        // ✅ ВЫЗЫВАЕМ ФУНКЦИЮ УПРАВЛЕНИЯ СОСТОЯНИЕМ (новая запись)
-        updateModalState(null);
-        
+        // ✅ ДЛЯ НОВОЙ ЗАПИСИ - УСТАНАВЛИВАЕМ ТЕКУЩЕГО ПОЛЬЗОВАТЕЛЯ
         const user = getCurrentUser();
         if (user && user.name && modalMasterName) {
             modalMasterName.value = user.name;
         }
+        
+        // Управление состоянием (новая запись)
+        updateModalState(null);
     }
     
     modalLoading.style.display = 'none';

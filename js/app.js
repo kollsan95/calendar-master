@@ -64,7 +64,7 @@ const UI_COLORS = {
 
 // === ТЕКСТОВЫЕ КОНСТАНТЫ ===
 const TEXTS = {
-    weekdays: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+    weekdays: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
     months: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
              'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'],
     windowsTimes: ['09:00', '12:00', '15:00', '18:00 (19:00)'],
@@ -1296,6 +1296,7 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     }
     
     modalLoading.style.display = 'none';
+    modalSave.disabled = false;
     modalOverlay.style.display = 'flex';
     modalOverlay.dataset.date = dateKey;
 }

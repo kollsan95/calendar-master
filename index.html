@@ -67,17 +67,21 @@
             </div>
         </div>
 
-        <!-- Фильтры -->
-        <div id="filtersContainer">
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;max-width:400px;margin:0 auto;">
-                <button class="filter-chip active" data-type="all" style="font-size:16px;padding:10px 8px;border-width:3px;">Все</button>
-                <button class="filter-chip" data-type="Холодное" style="font-size:16px;padding:10px 8px;border-width:3px;">Холодное</button>
-                <button class="filter-chip" data-type="Полировка" style="font-size:16px;padding:10px 8px;border-width:3px;">Полировка</button>
-                <button class="filter-chip" data-type="free" style="font-size:16px;padding:10px 8px;border-width:3px;">Свободные</button>
-                <button class="filter-chip" data-type="Кератин" style="font-size:16px;padding:10px 8px;border-width:3px;">Кератин</button>
-                <button class="filter-chip" data-type="Ботокс" style="font-size:16px;padding:10px 8px;border-width:3px;">Ботокс</button>
-            </div>
-        </div>
+<!-- Фильтры -->
+<div id="filtersContainer">
+    <!-- Первая строка -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;max-width:480px;margin:0 auto 8px auto;justify-content:center;">
+        <button class="filter-chip" data-type="Выходной" style="font-size:18px;padding:14px 0;border-width:3px;border-radius:30px;width:30%;min-width:100px;text-align:center;">Выходные</button>
+        <button class="filter-chip" data-type="Ботокс" style="font-size:18px;padding:14px 0;border-width:3px;border-radius:30px;width:30%;min-width:100px;text-align:center;">Ботокс</button>
+        <button class="filter-chip" data-type="Холодное" style="font-size:18px;padding:14px 0;border-width:3px;border-radius:30px;width:30%;min-width:100px;text-align:center;">Холодное</button>
+    </div>
+    <!-- Вторая строка -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;max-width:480px;margin:0 auto;justify-content:center;">
+        <button class="filter-chip" data-type="free" style="font-size:18px;padding:14px 0;border-width:3px;border-radius:30px;width:30%;min-width:100px;text-align:center;">Свободные</button>
+        <button class="filter-chip" data-type="Кератин" style="font-size:18px;padding:14px 0;border-width:3px;border-radius:30px;width:30%;min-width:100px;text-align:center;">Кератин</button>
+        <button class="filter-chip" data-type="Полировка" style="font-size:18px;padding:14px 0;border-width:3px;border-radius:30px;width:30%;min-width:100px;text-align:center;">Полировка</button>
+    </div>
+</div>
 
         <!-- Календарь -->
         <div id="calendarContainer">

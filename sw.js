@@ -1,4 +1,4 @@
-const CACHE_NAME = 'calendar-pwa-v27';
+const CACHE_NAME = 'calendar-pwa-v28';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -18,11 +18,9 @@ self.addEventListener('install', function(event) {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(function(cache) {
-                console.log('📦 Кеширование статики...');
                 return cache.addAll(urlsToCache);
             })
             .then(function() {
-                console.log('✅ Статика закеширована');
                 return self.skipWaiting();
             })
     );
@@ -35,14 +33,12 @@ self.addEventListener('activate', function(event) {
             return Promise.all(
                 cacheNames.map(function(cacheName) {
                     if (cacheName !== CACHE_NAME) {
-                        console.log('🗑️ Удаление старого кеша:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
             );
         })
         .then(function() {
-            console.log('✅ Service Worker активирован');
             return self.clients.claim();
         })
     );

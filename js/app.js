@@ -3008,6 +3008,7 @@ function initWindowsEditor() {
             const dayRecords = windowsState.recordsData[dateKey] || [];
             
             let shouldStrikeSlot18 = false;
+            let hasWeekendSlot18 = false;
             
             for (let r = 0; r < dayRecords.length; r++) {
                 const record = dayRecords[r];
@@ -3020,10 +3021,16 @@ function initWindowsEditor() {
                 const startFloor = Math.floor(record.startHour);
                 const endFloor = Math.floor(record.endHour);
                 
-                // Проверка для слота "18:00 (19:00)" только для обычных записей
+                // Проверка для слота "18:00 (19:00)"
                 if (record.serviceTypeName !== 'Выходной' && record.serviceType !== 'Выходной') {
+                    // Обычная запись
                     if (startFloor >= 18 || endFloor > 19) {
                         shouldStrikeSlot18 = true;
+                    }
+                } else {
+                    // Запись "Выходной"
+                    if (startFloor >= 18 || endFloor > 19) {
+                        hasWeekendSlot18 = true;
                     }
                 }
                 
@@ -3045,8 +3052,10 @@ function initWindowsEditor() {
                 }
             }
             
-            // Зачеркиваем слот "18:00 (19:00)" только если есть обычная запись
-            if (shouldStrikeSlot18) {
+            // ✅ Зачеркиваем слот "18:00 (19:00)" если:
+            // 1. Есть обычная запись, пересекающая его
+            // 2. ИЛИ включена галочка И есть запись "Выходной", пересекающая его
+            if (shouldStrikeSlot18 || (showWeekends && hasWeekendSlot18)) {
                 booked.add(TIMES[3]);
             }
             

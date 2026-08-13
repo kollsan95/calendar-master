@@ -981,9 +981,13 @@ function buildCalendarHTML() {
         </div>
         <div class="calendar-grid">
     `;
-    TEXTS.weekdays.forEach(day => {
+    
+    // ✅ ДНИ НЕДЕЛИ В ПОРЯДКЕ: ПН, ВТ, СР, ЧТ, ПТ, СБ, ВС
+    const weekdaysDisplay = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    weekdaysDisplay.forEach(day => {
         html += `<div style="text-align:center;font-size:10px;font-weight:600;color:#7B8D8E;padding:2px 0 4px;text-transform:uppercase;">${day}</div>`;
     });
+
     const firstDay = new Date(currentYear, currentMonth - 1, 1);
     const lastDay = new Date(currentYear, currentMonth, 0);
     for (let i = 1; i < (firstDay.getDay() || 7); i++) {

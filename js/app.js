@@ -3021,7 +3021,7 @@ function initWindowsEditor() {
                 const startFloor = Math.floor(record.startHour);
                 const endFloor = Math.floor(record.endHour);
                 
-                // ✅ ЕСЛИ ЭТО ЗАПИСЬ "ВЫХОДНОЙ" И ГАЛОЧКА ВКЛЮЧЕНА
+                // ✅ ЗАПИСЬ "ВЫХОДНОЙ" И ГАЛОЧКА ВКЛЮЧЕНА
                 if ((record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной') && showWeekends) {
                     for (let t = 0; t < TIMES.length; t++) {
                         if (TIMES[t].includes('(')) {
@@ -3042,7 +3042,6 @@ function initWindowsEditor() {
                 if (record.serviceTypeName !== 'Выходной' && record.serviceType !== 'Выходной') {
                     for (let t = 0; t < TIMES.length; t++) {
                         if (TIMES[t].includes('(')) {
-                            // Слот "18:00 (19:00)" обрабатываем отдельно
                             if (startFloor < 19 && endFloor > 18) {
                                 shouldStrikeSlot18 = true;
                             }

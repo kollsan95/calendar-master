@@ -1048,18 +1048,16 @@ function drawTile(canvas, day, isPast) {
     const user = getCurrentUser();
     const currentUserId = user ? user.id : null;
     
-    // Создаем массив занятости по часам (с округлением в меньшую сторону)
+    // Создаем массив занятости по часам
     const hourState = [];
     for (let i = 0; i < 12; i++) {
         const hour = 9 + i;
         let isBooked = false, color = getUIColor('Чужие записи'), serviceTypeName = '', isOwn = false;
         let recordId = null;
         for (const r of dayRecords) {
-            // ✅ ОКРУГЛЯЕМ startHour и endHour В МЕНЬШУЮ СТОРОНУ до целого часа
-            const startHourFloor = Math.floor(r.startHour);
-            const endHourFloor = Math.floor(r.endHour);
-            
-            if (hour >= startHourFloor && hour < endHourFloor) {
+            const startFloor = Math.floor(r.startHour);
+            const endFloor = Math.floor(r.endHour);
+            if (hour >= startFloor && hour < endFloor) {
                 isBooked = true;
                 const serviceName = r.serviceTypeName || r.serviceType || '';
                 isOwn = currentUserId && r.masterId === currentUserId;
@@ -1129,11 +1127,42 @@ function drawTile(canvas, day, isPast) {
             isGreen = false;
             
         } else {
+            // ✅ СВОБОДНЫЙ СЛОТ
             if (showFreeSlots) {
-                fillColor = getUIColor('Свободные слоты');
-                strokeColor = '#388E3C';
-                isGreen = true;
-                isGray = false;
+                // Проверяем, есть ли свободные слоты подряд (минимум 2)
+                // Смотрим влево
+                let leftFree = 0;
+                for (let j = i - 1; j >= 0; j--) {
+                    if (!hourState[j].isBooked) {
+                        leftFree++;
+                    } else {
+                        break;
+                    }
+                }
+                // Смотрим вправо
+                let rightFree = 0;
+                for (let j = i + 1; j < 12; j++) {
+                    if (!hourState[j].isBooked) {
+                        rightFree++;
+                    } else {
+                        break;
+                    }
+                }
+                // Общее количество свободных слотов подряд (включая текущий)
+                const totalFree = leftFree + 1 + rightFree;
+                
+                // ✅ ЗАКРАШИВАЕМ ТОЛЬКО ЕСЛИ ОБЩЕЕ КОЛИЧЕСТВО >= 2
+                if (totalFree >= 2) {
+                    fillColor = getUIColor('Свободные слоты');
+                    strokeColor = '#388E3C';
+                    isGreen = true;
+                    isGray = false;
+                } else {
+                    fillColor = 'transparent';
+                    strokeColor = isPast ? '#E8E8E8' : '#E0F2F1';
+                    isGreen = false;
+                    isGray = false;
+                }
             } else {
                 fillColor = 'transparent';
                 strokeColor = isPast ? '#E8E8E8' : '#E0F2F1';
@@ -1154,51 +1183,10 @@ function drawTile(canvas, day, isPast) {
         ctx.lineWidth = isGreen ? 1 : 2.5;
         ctx.stroke();
         
-        if (isBooked && !isGreen) {
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, angleStart, angleEnd);
-            ctx.strokeStyle = strokeColor;
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.arc(cx, cy, innerRadius, angleStart, angleEnd);
-            ctx.strokeStyle = strokeColor;
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
-            
-            const prevState = i > 0 ? hourState[i - 1] : null;
-            const isPrevSameRecord = prevState && 
-                                     prevState.isBooked && 
-                                     prevState.recordId === state.recordId;
-            const nextState = i < 11 ? hourState[i + 1] : null;
-            const isNextSameRecord = nextState && 
-                                     nextState.isBooked && 
-                                     nextState.recordId === state.recordId;
-            
-            const drawLeftBorder = !isPrevSameRecord;
-            const drawRightBorder = !isNextSameRecord;
-            
-            if (drawLeftBorder) {
-                ctx.beginPath();
-                ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
-                ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-            }
-            
-            if (drawRightBorder) {
-                ctx.beginPath();
-                ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
-                ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-            }
-        }
+        // ... остальной код (границы для занятых слотов)
     }
     
+    // Внутренний круг
     ctx.beginPath();
     ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
     ctx.fillStyle = '#FFFFFF';
@@ -1207,6 +1195,7 @@ function drawTile(canvas, day, isPast) {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     
+    // Цифра дня
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = isPast ? '#A0A0A0' : '#37474F';

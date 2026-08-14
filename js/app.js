@@ -2983,6 +2983,23 @@ function initWindowsEditor() {
         const currentUser = getCurrentUser();
         const currentUserId = currentUser ? currentUser.id : null;
         
+        // ✅ ВРЕМЕННЫЕ СЛОТЫ (в часах)
+        const timeSlots = [9, 12, 15, 18];
+        
+        // ✅ ФУНКЦИЯ: найти ближайший слот для часа (целое число)
+        function getClosestSlot(hour) {
+            let closest = timeSlots[0];
+            let minDiff = Math.abs(hour - timeSlots[0]);
+            for (let i = 1; i < timeSlots.length; i++) {
+                const diff = Math.abs(hour - timeSlots[i]);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = timeSlots[i];
+                }
+            }
+            return closest;
+        }
+        
         for (let d = 1; d <= days; d++) {
             const date = new Date(year, month - 1, d);
             const ds = String(d).padStart(2, '0') + '.' + String(month).padStart(2, '0');
@@ -3013,48 +3030,51 @@ function initWindowsEditor() {
             for (let r = 0; r < dayRecords.length; r++) {
                 const record = dayRecords[r];
                 
-                // Пропускаем чужие выходные
                 if ((record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной') && record.masterId !== currentUserId) {
                     continue;
                 }
                 
+                // ✅ ОКРУГЛЯЕМ В МЕНЬШУЮ СТОРОНУ
                 const startFloor = Math.floor(record.startHour);
                 const endFloor = Math.floor(record.endHour);
                 
-                // Проверка для слота "18:00 (19:00)"
-                if (record.serviceTypeName !== 'Выходной' && record.serviceType !== 'Выходной') {
-                    // Обычная запись
-                    if (startFloor >= 18 || endFloor > 19) {
-                        shouldStrikeSlot18 = true;
-                    }
-                } else {
-                    // Запись "Выходной"
-                    if (startFloor >= 18 || endFloor > 19) {
-                        hasWeekendSlot18 = true;
-                    }
-                }
+                // ✅ ОПРЕДЕЛЯЕМ БЛИЖАЙШИЙ СЛОТ ДЛЯ ОКРУГЛЕННОГО ВРЕМЕНИ НАЧАЛА
+                const closestSlot = getClosestSlot(startFloor);
                 
                 // Обычные слоты (исключаем слот "18:00 (19:00)")
                 for (let t = 0; t < TIMES.length; t++) {
                     if (TIMES[t].includes('(')) {
                         continue;
                     }
-                    let hour = parseInt(TIMES[t].split(':')[0]);
-                    if (hour >= startFloor && hour < endFloor) {
-                        if (record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной') {
-                            if (showWeekends) {
-                                weekendSlots.add(TIMES[t]);
+                    let slotHour = parseInt(TIMES[t].split(':')[0]);
+                    
+                    // ✅ ЗАЧЕРКИВАЕМ ТОЛЬКО БЛИЖАЙШИЙ СЛОТ
+                    if (slotHour === closestSlot) {
+                        // Проверяем, что запись действительно занимает этот слот
+                        if (slotHour >= startFloor && slotHour < endFloor) {
+                            if (record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной') {
+                                if (showWeekends) {
+                                    weekendSlots.add(TIMES[t]);
+                                }
+                            } else {
+                                booked.add(TIMES[t]);
                             }
-                        } else {
-                            booked.add(TIMES[t]);
                         }
+                    }
+                }
+                
+                // Проверка для слота "18:00 (19:00)"
+                if (record.serviceTypeName !== 'Выходной' && record.serviceType !== 'Выходной') {
+                    if (closestSlot === 18 && startFloor >= 18 && startFloor < 19) {
+                        shouldStrikeSlot18 = true;
+                    }
+                } else {
+                    if (closestSlot === 18 && startFloor >= 18 && startFloor < 19) {
+                        hasWeekendSlot18 = true;
                     }
                 }
             }
             
-            // ✅ Зачеркиваем слот "18:00 (19:00)" если:
-            // 1. Есть обычная запись, пересекающая его
-            // 2. ИЛИ включена галочка И есть запись "Выходной", пересекающая его
             if (shouldStrikeSlot18 || (showWeekends && hasWeekendSlot18)) {
                 booked.add(TIMES[3]);
             }
@@ -3062,7 +3082,6 @@ function initWindowsEditor() {
             const timeParts = [];
             for (let t = 0; t < TIMES.length; t++) {
                 let shouldStrike = booked.has(TIMES[t]) || isPastDay;
-                // Выходные зачеркиваются только если галочка включена
                 if (showWeekends && weekendSlots.has(TIMES[t])) {
                     shouldStrike = true;
                 }

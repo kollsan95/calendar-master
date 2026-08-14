@@ -2983,6 +2983,23 @@ function initWindowsEditor() {
         const currentUser = getCurrentUser();
         const currentUserId = currentUser ? currentUser.id : null;
         
+        // Временные слоты (в часах)
+        const timeSlots = [9, 12, 15, 18];
+        
+        // Функция: найти ближайший слот для часа (целое число)
+        function getClosestSlot(hour) {
+            let closest = timeSlots[0];
+            let minDiff = Math.abs(hour - timeSlots[0]);
+            for (let i = 1; i < timeSlots.length; i++) {
+                const diff = Math.abs(hour - timeSlots[i]);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = timeSlots[i];
+                }
+            }
+            return closest;
+        }
+        
         for (let d = 1; d <= days; d++) {
             const date = new Date(year, month - 1, d);
             const ds = String(d).padStart(2, '0') + '.' + String(month).padStart(2, '0');
@@ -3013,7 +3030,6 @@ function initWindowsEditor() {
             for (let r = 0; r < dayRecords.length; r++) {
                 const record = dayRecords[r];
                 
-                // Пропускаем чужие выходные
                 if ((record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной') && record.masterId !== currentUserId) {
                     continue;
                 }
@@ -3021,7 +3037,7 @@ function initWindowsEditor() {
                 const startFloor = Math.floor(record.startHour);
                 const endFloor = Math.floor(record.endHour);
                 
-                // ✅ ЗАПИСЬ "ВЫХОДНОЙ" И ГАЛОЧКА ВКЛЮЧЕНА
+                // ✅ ЕСЛИ ЭТО ЗАПИСЬ "ВЫХОДНОЙ" И ГАЛОЧКА ВКЛЮЧЕНА
                 if ((record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной') && showWeekends) {
                     for (let t = 0; t < TIMES.length; t++) {
                         if (TIMES[t].includes('(')) {
@@ -3038,24 +3054,29 @@ function initWindowsEditor() {
                     continue;
                 }
                 
-                // ✅ ОБЫЧНАЯ ЗАПИСЬ — ЗАЧЕРКИВАЕМ ВСЕ СЛОТЫ В ДИАПАЗОНЕ
+                // ✅ ОБЫЧНАЯ ЗАПИСЬ
                 if (record.serviceTypeName !== 'Выходной' && record.serviceType !== 'Выходной') {
+                    // 1. Определяем ближайший слот к началу записи
+                    const closestSlot = getClosestSlot(startFloor);
+                    
+                    // 2. Зачеркиваем все слоты в диапазоне
                     for (let t = 0; t < TIMES.length; t++) {
                         if (TIMES[t].includes('(')) {
-                            if (startFloor < 19 && endFloor > 18) {
+                            if (endFloor > 19) {
                                 shouldStrikeSlot18 = true;
                             }
                             continue;
                         }
                         let slotHour = parseInt(TIMES[t].split(':')[0]);
-                        if (slotHour >= startFloor && slotHour < endFloor) {
+                        
+                        // ✅ ЗАЧЕРКИВАЕМ ЕСЛИ: слот в диапазоне ИЛИ это ближайший слот к началу
+                        if ((slotHour >= startFloor && slotHour < endFloor) || slotHour === closestSlot) {
                             booked.add(TIMES[t]);
                         }
                     }
                 }
             }
             
-            // Зачеркиваем слот "18:00 (19:00)"
             if (shouldStrikeSlot18 || (showWeekends && hasWeekendSlot18)) {
                 booked.add(TIMES[3]);
             }

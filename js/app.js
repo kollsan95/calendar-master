@@ -1127,10 +1127,9 @@ function drawTile(canvas, day, isPast) {
             isGreen = false;
             
         } else {
-            // ✅ СВОБОДНЫЙ СЛОТ
-            if (showFreeSlots) {
+            // СВОБОДНЫЙ СЛОТ
+            if (showFreeSlots && !isPast) {
                 // Проверяем, есть ли свободные слоты подряд (минимум 2)
-                // Смотрим влево
                 let leftFree = 0;
                 for (let j = i - 1; j >= 0; j--) {
                     if (!hourState[j].isBooked) {
@@ -1139,7 +1138,6 @@ function drawTile(canvas, day, isPast) {
                         break;
                     }
                 }
-                // Смотрим вправо
                 let rightFree = 0;
                 for (let j = i + 1; j < 12; j++) {
                     if (!hourState[j].isBooked) {
@@ -1148,10 +1146,8 @@ function drawTile(canvas, day, isPast) {
                         break;
                     }
                 }
-                // Общее количество свободных слотов подряд (включая текущий)
                 const totalFree = leftFree + 1 + rightFree;
                 
-                // ✅ ЗАКРАШИВАЕМ ТОЛЬКО ЕСЛИ ОБЩЕЕ КОЛИЧЕСТВО >= 2
                 if (totalFree >= 2) {
                     fillColor = getUIColor('Свободные слоты');
                     strokeColor = '#388E3C';
@@ -1183,10 +1179,54 @@ function drawTile(canvas, day, isPast) {
         ctx.lineWidth = isGreen ? 1 : 2.5;
         ctx.stroke();
         
-        // ... остальной код (границы для занятых слотов)
+        if (isBooked && !isGreen) {
+            // Внешняя граница
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, angleStart, angleEnd);
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            
+            // Внутренняя граница
+            ctx.beginPath();
+            ctx.arc(cx, cy, innerRadius, angleStart, angleEnd);
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            
+            const prevState = i > 0 ? hourState[i - 1] : null;
+            const isPrevSameRecord = prevState && 
+                                     prevState.isBooked && 
+                                     prevState.recordId === state.recordId;
+            const nextState = i < 11 ? hourState[i + 1] : null;
+            const isNextSameRecord = nextState && 
+                                     nextState.isBooked && 
+                                     nextState.recordId === state.recordId;
+            
+            const drawLeftBorder = !isPrevSameRecord;
+            const drawRightBorder = !isNextSameRecord;
+            
+            if (drawLeftBorder) {
+                ctx.beginPath();
+                ctx.moveTo(cx + innerRadius * Math.cos(angleStart), cy + innerRadius * Math.sin(angleStart));
+                ctx.lineTo(cx + radius * Math.cos(angleStart), cy + radius * Math.sin(angleStart));
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+            }
+            
+            if (drawRightBorder) {
+                ctx.beginPath();
+                ctx.moveTo(cx + innerRadius * Math.cos(angleEnd), cy + innerRadius * Math.sin(angleEnd));
+                ctx.lineTo(cx + radius * Math.cos(angleEnd), cy + radius * Math.sin(angleEnd));
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+            }
+        }
     }
     
-    // Внутренний круг
+    // Внутренний круг поверх секторов (всегда белый)
     ctx.beginPath();
     ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
     ctx.fillStyle = '#FFFFFF';

@@ -1058,6 +1058,12 @@ function drawTile(canvas, day, isPast) {
             const startFloor = Math.floor(r.startHour);
             const endFloor = Math.floor(r.endHour);
             if (hour >= startFloor && hour < endFloor) {
+                // ✅ ЕСЛИ ЗАПИСЬ "ВЫХОДНОЙ" И АКТИВЕН ФИЛЬТР "СВОБОДНЫЕ" — НЕ СЧИТАЕМ ЗАНЯТОЙ
+                const isWeekend = (r.serviceTypeName === 'Выходной' || r.serviceType === 'Выходной');
+                if (isWeekend && showFreeSlots) {
+                    // Пропускаем — не считаем занятым
+                    continue;
+                }
                 isBooked = true;
                 const serviceName = r.serviceTypeName || r.serviceType || '';
                 isOwn = currentUserId && r.masterId === currentUserId;

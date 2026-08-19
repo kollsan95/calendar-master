@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Настройки - Календарь мастера</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Стили -->
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+
+<div class="settings-page" id="settingsApp">
+    <!-- Шапка -->
+    <div class="settings-header">
+        <h1>⚙️ Настройки</h1>
+        <button class="back-btn" id="settingsBackBtn">✕</button>
+    </div>
+    
+    <!-- Вкладки -->
+    <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #E0F2F1;">
+        <button id="settingsTabGeneral" class="settings-tab active">Основные</button>
+        <button id="settingsTabColors" class="settings-tab">🎨 Цвета</button>
+    </div>
+    
+    <!-- Вкладка: Основные -->
+    <div id="settingsTabGeneralContent">
+        <!-- Шаблон новой записи -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #E0F2F1;">
+            <div>
+                <div style="font-weight:500;color:#37474F;">Шаблон новой записи</div>
+                <div style="font-size:12px;color:#7B8D8E;">Текст для уведомления клиентов</div>
+            </div>
+            <button class="btn btn-outline" id="settingsTemplateEdit" style="border-radius:20px;padding:6px 16px;">Редактировать</button>
+        </div>
+        
+        <!-- Шаблон подтверждения -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #E0F2F1;">
+            <div>
+                <div style="font-weight:500;color:#37474F;">Шаблон подтверждения записи</div>
+                <div style="font-size:12px;color:#7B8D8E;">Текст для подтверждения записи</div>
+            </div>
+            <button class="btn btn-outline" id="settingsConfirmTemplateEdit" style="border-radius:20px;padding:6px 16px;">Редактировать</button>
+        </div>
+        
+        <!-- Автоочистка -->
+        <div style="padding:12px 0;border-bottom:1px solid #E0F2F1;">
+            <div style="font-weight:500;color:#37474F;margin-bottom:8px;">Автоочистка</div>
+            <div id="settingsCleanupContainer"></div>
+        </div>
+        
+        <!-- Админ -->
+        <div style="padding:12px 0;border-bottom:1px solid #E0F2F1;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:500;color:#37474F;">👑 Админ</div>
+                    <div style="font-size:12px;color:#7B8D8E;">Редактирование чужих записей</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="settingsAdminMode">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Выход -->
+        <div id="settingsLogoutContainer" style="padding:12px 0;border-top:1px solid #E0F2F1;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <div style="font-weight:500;color:#37474F;font-size:15px;" id="settingsUserName">Загрузка...</div>
+                    <div style="font-size:12px;color:#7B8D8E;" id="settingsUserPhone"></div>
+                </div>
+                <button class="btn btn-danger" id="settingsLogoutBtn" style="padding:6px 16px;background:#C62828;color:#FFF;border:none;border-radius:8px;cursor:pointer;">🚪 Выйти</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Вкладка: Цвета -->
+    <div id="settingsTabColorsContent" style="display:none;">
+        <div style="margin-bottom:12px;">
+            <div style="font-weight:500;color:#37474F;margin-bottom:8px;">Цвета процедур</div>
+            <div id="settingsColorsContainer"></div>
+        </div>
+        <div style="margin-top:12px;border-top:1px solid #E0F2F1;padding-top:12px;">
+            <div style="font-weight:500;color:#37474F;margin-bottom:8px;">Системные цвета</div>
+            <div id="settingsUIColorsContainer"></div>
+        </div>
+        <button class="btn btn-save" id="settingsColorsSave" style="width:100%;margin-top:12px;padding:10px;">💾 Сохранить все цвета</button>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!--  ПОДКЛЮЧЕНИЕ СКРИПТОВ                       -->
+<!-- ============================================ -->
+
+<!-- 1. Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<!-- 2. Конфигурация Firebase -->
+<script src="js/firebase-config.js"></script>
+
+<!-- 3. Auth -->
+<script src="js/auth.js"></script>
+
+<!-- 4. Общие функции -->
+<script src="js/common.js"></script>
+
+<!-- 5. Настройки -->
+<script src="js/settings.js"></script>
+
+<!-- 6. Проверка авторизации -->
+<script>
+    if (typeof isUserAuthenticated !== 'undefined' && !isUserAuthenticated()) {
+        window.location.href = '/login.html';
+    }
+</script>
+
+</body>
+</html>

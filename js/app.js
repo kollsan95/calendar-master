@@ -5,63 +5,6 @@
 // === КОНСТАНТЫ ===
 const INNER_RADIUS_RATIO = 0.5;
 
-// === ПРОЦЕДУРЫ (единая структура с ID) ===
-const SERVICES = {
-    'service_1': {
-        id: 'service_1',
-        name: 'Кератин',
-        displayName: 'Кератиновое выпрямление',
-        color: '#D4AF37'
-    },
-    'service_2': {
-        id: 'service_2',
-        name: 'Ботокс',
-        displayName: 'Ботокс для волос',
-        color: '#4A90E2'
-    },
-    'service_3': {
-        id: 'service_3',
-        name: 'Холодное',
-        displayName: 'Холодное восстановление',
-        color: '#A8D8EA'
-    },
-    'service_4': {
-        id: 'service_4',
-        name: 'Полировка',
-        displayName: 'Полировка волос',
-        color: '#7B8D8E'
-    },
-    'service_5': {
-        id: 'service_5',
-        name: 'Выходной',
-        displayName: 'Выходной день',
-        color: '#9E9E9E'
-    }
-};
-
-const SERVICE_KEYS = Object.keys(SERVICES);
-
-// Для быстрого доступа
-const SERVICE_BY_ID = {};
-const SERVICE_BY_NAME = {};
-SERVICE_KEYS.forEach(key => {
-    const service = SERVICES[key];
-    SERVICE_BY_ID[service.id] = service;
-    SERVICE_BY_NAME[service.name] = service;
-});
-
-// === СИСТЕМНЫЕ ЦВЕТА ===
-const UI_COLORS = {
-    'Чужие записи': {
-        displayName: 'Записи других мастеров',
-        color: '#E0E0E0'
-    },
-    'Свободные слоты': {
-        displayName: 'Свободные временные слоты',
-        color: '#4CAF50'
-    }
-};
-
 // === ТЕКСТОВЫЕ КОНСТАНТЫ ===
 const TEXTS = {
     weekdays: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
@@ -261,68 +204,34 @@ function initDOM() {
 }
 
 // ============================================
-//  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С УСЛУГАМИ
-// ============================================
-
-function getServiceById(id) {
-    return SERVICE_BY_ID[id] || null;
-}
-
-function getServiceByName(name) {
-    return SERVICE_BY_NAME[name] || null;
-}
-
-function getServiceIdByName(name) {
-    const service = getServiceByName(name);
-    return service ? service.id : null;
-}
-
-function getServiceNameById(id) {
-    const service = getServiceById(id);
-    return service ? service.name : null;
-}
-
-function getServiceDisplayNameById(id) {
-    const service = getServiceById(id);
-    return service ? service.displayName : null;
-}
-
-function getServiceColor(serviceType) {
-    let service = getServiceByName(serviceType);
-    if (!service) {
-        service = getServiceById(serviceType);
-    }
-    return service ? service.color : '#E0E0E0';
-}
-
-// ============================================
 //  ЗАГРУЗКА НАСТРОЕК
 // ============================================
 
 function loadSettings() {
+    
+    // Обновляем цвета фильтров
+    updateFilterColors();
+    
+    // Если есть другие настройки в localStorage - загружаем их
     try {
-        const saved = localStorage.getItem('serviceColors');
-        if (saved) {
-            const colors = JSON.parse(saved);
-            SERVICE_KEYS.forEach(key => {
-                const service = SERVICES[key];
-                if (colors[service.id]) {
-                    service.color = colors[service.id];
-                }
-            });
-            if (colors._ui) {
-                Object.entries(colors._ui).forEach(([key, color]) => {
-                    if (UI_COLORS[key]) {
-                        UI_COLORS[key].color = color;
-                    }
-                });
-            }
+        // Шаблоны писем
+        const savedTemplate = localStorage.getItem('letterTemplate');
+        if (savedTemplate) {
+            templateText = savedTemplate;
         }
-    } catch {}
-}
-
-function saveSettings(colors) {
-    localStorage.setItem('serviceColors', JSON.stringify(colors));
+        
+        const savedConfirmTemplate = localStorage.getItem('confirmLetterTemplate');
+        if (savedConfirmTemplate) {
+            confirmTemplateText = savedConfirmTemplate;
+        }
+        
+        if (typeof updateAdminSliderUI === 'function') {
+            updateAdminSliderUI();
+        }
+                
+    } catch (error) {
+        console.warn('⚠️ Ошибка загрузки настроек:', error);
+    }
 }
 
 function loadTemplate(key, defaultText) {
@@ -335,39 +244,6 @@ function saveTemplate(key, text) {
     localStorage.setItem(key, text);
     if (key === 'letterTemplate') templateText = text;
     if (key === 'confirmLetterTemplate') confirmTemplateText = text;
-}
-
-// ============================================
-//  АДМИН РЕЖИМ
-// ============================================
-
-function isAdminMode() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEYS.ADMIN_MODE);
-        return saved === 'true';
-    } catch { return false; }
-}
-
-function setAdminMode(enabled) {
-    localStorage.setItem(STORAGE_KEYS.ADMIN_MODE, String(enabled));
-}
-
-function toggleAdminMode() {
-    const newValue = !isAdminMode();
-    setAdminMode(newValue);
-    updateAdminSliderUI();
-    showToast(newValue ? TEXTS.messages.adminOn : TEXTS.messages.adminOff);
-}
-
-function updateAdminSliderUI() {
-    const checkbox = document.getElementById('settingsAdminMode');
-    const slider = document.getElementById('adminSlider');
-    const dot = document.getElementById('adminSliderDot');
-    if (!checkbox || !slider || !dot) return;
-    const isEnabled = isAdminMode();
-    checkbox.checked = isEnabled;
-    slider.style.background = isEnabled ? '#008080' : '#ccc';
-    dot.style.transform = isEnabled ? 'translateX(22px)' : 'translateX(0)';
 }
 
 // ============================================
@@ -450,27 +326,22 @@ function formatDateForLetter(dateStr) {
     return String(day).padStart(2, '0') + '.' + String(month).padStart(2, '0') + '.' + year;
 }
 
-function getUIColor(key) {
-    const uiColor = UI_COLORS[key];
-    return uiColor ? uiColor.color : '#E0E0E0';
-}
-
 function getMasterPhoneByName(name) {
     if (!modalMasterName) return '';
+    
+    // Проверяем, есть ли такая опция в select
     const option = Array.from(modalMasterName.options).find(o => o.value === name);
-    return option ? option.dataset.phone || '' : '';
+    if (option) {
+        return option.dataset.phone || '';
+    }
+    
+    // Если опции нет (оффлайн-режим), возвращаем пустую строку
+    return '';
 }
 
 function getMonthKey() {
     const now = new Date();
     return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-}
-
-function getCleanupDays() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEYS.CLEANUP_DAYS);
-        return saved ? parseInt(saved) : 90;
-    } catch { return 90; }
 }
 
 function generateLetter(record, template) {
@@ -514,11 +385,69 @@ function checkAuth() {
     return true;
 }
 
+// функция для поиска записи по ID (с учетом локальных ID)
+
+function getRecordById(dateKey, recordId) {
+    const dayRecords = recordsData[dateKey] || [];
+    if (!Array.isArray(dayRecords)) return null;
+    
+    // Ищем по обычному id или по _localId
+    return dayRecords.find(r => {
+        // Сравниваем как строки, чтобы избежать проблем с типами
+        const idStr = String(r.id || '');
+        const localIdStr = String(r._localId || '');
+        const searchIdStr = String(recordId || '');
+        return idStr === searchIdStr || localIdStr === searchIdStr;
+    }) || null;
+}
+
 // ============================================
 //  ЗАГРУЗКА СПИСКА МАСТЕРОВ
 // ============================================
 
 async function loadMastersList() {
+    // ✅ ПРОВЕРЯЕМ ОФФЛАЙН-РЕЖИМ
+    const isOffline = localStorage.getItem('offline_mode') === 'true';
+    
+    if (isOffline) {
+        console.log('📴 Оффлайн-режим: загружаем только текущего пользователя');
+        const currentUser = getCurrentUser();
+        const masters = [];
+        
+        if (currentUser) {
+            masters.push({
+                id: currentUser.id || 'offline',
+                name: currentUser.name || 'Мастер',
+                phone: currentUser.phone || ''
+            });
+        } else {
+            // Если пользователь не найден, создаем дефолтного
+            masters.push({
+                id: 'offline_default',
+                name: 'Мастер',
+                phone: ''
+            });
+        }
+        
+        // Обновляем select
+        if (modalMasterName) {
+            modalMasterName.innerHTML = '';
+            masters.forEach(m => {
+                const option = document.createElement('option');
+                option.value = m.name;
+                option.textContent = m.name + (m.phone ? ' (' + m.phone + ')' : '');
+                option.dataset.phone = m.phone || '';
+                option.dataset.userId = m.id;
+                modalMasterName.appendChild(option);
+            });
+            modalMasterName.value = masters[0].name;
+        }
+        
+        console.log('👤 Загружено мастеров (оффлайн):', masters.length);
+        return masters;
+    }
+    
+    // ✅ ОНЛАЙН-РЕЖИМ: загружаем из Firebase
     try {
         const usersRef = firebase.database().ref('users');
         const snapshot = await usersRef.once('value');
@@ -543,9 +472,6 @@ async function loadMastersList() {
         }
         
         if (modalMasterName) {
-            // Сохраняем текущее значение
-            const currentValue = modalMasterName.value;
-            
             modalMasterName.innerHTML = '';
             masters.forEach(m => {
                 const option = document.createElement('option');
@@ -555,25 +481,15 @@ async function loadMastersList() {
                 option.dataset.userId = m.id;
                 modalMasterName.appendChild(option);
             });
-            
-            // Восстанавливаем значение, если оно было
-            if (currentValue) {
-                let found = false;
-                for (let i = 0; i < modalMasterName.options.length; i++) {
-                    if (modalMasterName.options[i].value === currentValue) {
-                        modalMasterName.selectedIndex = i;
-                        found = true;
-                        break;
-                    }
+            if (currentUser && currentUser.name) {
+                const found = Array.from(modalMasterName.options).find(o => o.value === currentUser.name);
+                if (found) {
+                    modalMasterName.value = currentUser.name;
+                } else if (masters.length > 0) {
+                    modalMasterName.value = masters[0].name;
                 }
-                // Если значение не найдено, добавляем его
-                if (!found && currentValue) {
-                    const option = document.createElement('option');
-                    option.value = currentValue;
-                    option.textContent = currentValue;
-                    modalMasterName.appendChild(option);
-                    modalMasterName.value = currentValue;
-                }
+            } else if (masters.length > 0) {
+                modalMasterName.value = masters[0].name;
             }
         }
         return masters;
@@ -588,18 +504,34 @@ async function loadMastersList() {
 // ============================================
 
 async function initFirebase() {
-    if (loader) loader.style.display = 'none';
+    // ✅ ПРОВЕРЯЕМ ОФФЛАЙН-РЕЖИМ
+    const isOffline = localStorage.getItem('offline_mode') === 'true';
+    if (isOffline) {
+        console.log('📴 Оффлайн-режим: пропускаем инициализацию Firebase');
+        firebaseInitialized = false;
+        return false;
+    }
+    
+    // Проверяем, что Firebase доступен
+    if (typeof firebase === 'undefined') {
+        console.error('❌ Firebase SDK не загружен');
+        return false;
+    }
+    
+    if (typeof FirebaseSync === 'undefined') {
+        console.error('❌ FirebaseSync не загружен');
+        return false;
+    }
     
     try {
-        if (typeof firebase === 'undefined') {
-            console.error('❌ Firebase SDK не загружен');
-            return false;
-        }
-        if (typeof FirebaseSync === 'undefined') {
-            console.error('❌ FirebaseSync не загружен');
-            return false;
-        }
         firebaseSync = new FirebaseSync();
+        
+        // Если это оффлайн-заглушка, не продолжаем
+        if (firebaseSync.isOffline) {
+            firebaseInitialized = false;
+            return false;
+        }
+        
         const data = await firebaseSync.loadAllRecords();
         console.log('📊 Данные загружены:', Object.keys(data).length, 'дней');
         firebaseInitialized = true;
@@ -617,47 +549,36 @@ async function initFirebase() {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
+    // === ИНИЦИАЛИЗАЦИЯ DOM ===
     initDOM();
+    
+    // === ЗАГРУЗКА НАСТРОЕК ===
     loadSettings();
     
+    // === ПРОВЕРКА АВТОРИЗАЦИИ ===
     if (!checkAuth()) return;
-    console.log('🚀 Приложение загружено');
-    updateFilterColors();
-    loadNotifications();
-    setTimeout(loadRecords, 500);
     
-    initFilters();
-    initNavigation();
-    initDetailControls();
-    initModal();
-    initCarousel();
-    initDetailCanvas();
-    initSettings();
-    initStats();
-    initNotifications();
-    initTemplateEditor();
-    initWindowsEditor();
-});
-
-// ============================================
-//  ЗАПИСИ (CRUD) - FIREBASE ВЕРСИЯ
-// ============================================
-
-async function loadRecords() {
-    if (loader) loader.style.display = 'none';
-    
-    if (!firebaseInitialized) {
-        const initialized = await initFirebase();
-        if (!initialized) {
-            setTimeout(loadRecords, 2000);
-            return;
+    // === ПРОВЕРКА ОФФЛАЙН-РЕЖИМА ===
+    const isOffline = localStorage.getItem('offline_mode') === 'true';
+    if (isOffline) {
+        console.log('📴 Оффлайн-режим активен');
+        
+        // Загружаем локальные записи
+        let localRecords = {};
+        if (typeof getLocalRecords === 'function') {
+            localRecords = getLocalRecords();
+        } else {
+            try {
+                localRecords = JSON.parse(localStorage.getItem('local_records') || '{}');
+            } catch (e) {
+                console.warn('⚠️ Ошибка загрузки локальных записей:', e);
+            }
         }
-    }
-    
-    try {
-        if (firebaseSync) {
-            firebaseSync.syncRecords((data) => {
-                recordsData = filterRecordsForUser(data);
+        
+        if (Object.keys(localRecords).length > 0) {
+            recordsData = localRecords;
+            // Рендерим после загрузки DOM
+            setTimeout(() => {
                 renderCalendar();
                 if (detailContainer.style.display === 'block') {
                     const d = Detail.currentDay, 
@@ -668,7 +589,441 @@ async function loadRecords() {
                     Detail.populateCarousel(d, m, y);
                 }
                 updateBadge();
-                console.log('🔄 Данные синхронизированы');
+                console.log('📦 Показаны локальные записи при загрузке, дней:', Object.keys(localRecords).length);
+            }, 100);
+        } else {
+            console.log('📭 Нет локальных записей');
+            recordsData = {};
+            setTimeout(() => {
+                renderCalendar();
+            }, 100);
+        }
+    }
+    
+    // === ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ===
+    console.log('🚀 Приложение загружено');
+    updateFilterColors();
+    loadNotifications();
+    setTimeout(loadRecords, 500);
+    
+    // === ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ ===
+    initFilters();
+    initNavigation();
+    initDetailControls();
+    initModal();
+    initCarousel();
+    initDetailCanvas();
+    initNotifications();
+    initTemplateEditor();
+    initWindowsEditor();
+    
+    // === ОБРАБОТЧИК КНОПКИ НАСТРОЕК ===
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = '/settings.html';
+        });
+    }
+    
+    // === ПРОВЕРКА СИНХРОНИЗАЦИИ ПОСЛЕ ВХОДА ===
+    const syncAfterLogin = sessionStorage.getItem('sync_after_login');
+    if (syncAfterLogin === 'true') {
+        sessionStorage.removeItem('sync_after_login');
+        
+        console.log('🔄 Запуск синхронизации после входа...');
+        
+        // Сначала инициализируем Firebase
+        initFirebaseForSync()
+            .then((initialized) => {
+                if (!initialized) {
+                    console.warn('⚠️ Firebase не инициализирован, синхронизация отложена');
+                    showToast('⚠️ Не удалось подключиться к облаку', 'error');
+                    return;
+                }
+                
+                // Затем синхронизируем
+                return syncLocalRecordsWithFirebase();
+            })
+            .then((result) => {
+                if (result) {
+                    console.log('✅ Синхронизация завершена:', result);
+                    
+                    // После успешной синхронизации очищаем все оффлайн-данные
+                    if (typeof clearAllOfflineData === 'function') {
+                        clearAllOfflineData();
+                        console.log('🗑️ Оффлайн-данные очищены');
+                    }
+                    
+                    // Перезагружаем записи из облака
+                    loadRecords();
+                    
+                    // Показываем итоговое сообщение
+                    let msg = '✅ Данные синхронизированы с облаком';
+                    if (result.syncedCount > 0) msg += '. Добавлено: ' + result.syncedCount;
+                    if (result.skippedCount > 0) msg += '. Пропущено (уже есть): ' + result.skippedCount;
+                    if (result.conflictCount > 0) msg += '. Конфликтов: ' + result.conflictCount;
+                    showToast(msg);
+                }
+            })
+            .catch(err => {
+                console.error('❌ Ошибка синхронизации:', err);
+                showToast('⚠️ Ошибка синхронизации: ' + err.message, 'error');
+            });
+    }
+    
+    // === ПРОВЕРКА SERVICE WORKER ===
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready
+            .then(function(registration) {
+                console.log('✅ Service Worker готов');
+            })
+            .catch(function(err) {
+                console.warn('⚠️ Service Worker не готов:', err);
+            });
+    }
+    
+    console.log('✅ Приложение полностью загружено');
+});
+
+// ============================================
+//  ФУНКЦИЯ ДЛЯ ИНИЦИАЛИЗАЦИИ FIREBASE ПЕРЕД СИНХРОНИЗАЦИЕЙ
+// ============================================
+
+async function initFirebaseForSync() {
+    console.log('🔄 initFirebaseForSync вызван');
+    
+    // Проверяем, не инициализирован ли уже firebaseSync
+    if (firebaseSync && !firebaseSync.isOffline && typeof firebaseSync.loadAllRecords === 'function') {
+        console.log('✅ firebaseSync уже инициализирован');
+        return true;
+    }
+    
+    // Проверяем оффлайн-режим
+    const isOffline = localStorage.getItem('offline_mode') === 'true';
+    if (isOffline) {
+        console.log('📴 Оффлайн-режим, синхронизация не требуется');
+        return false;
+    }
+    
+    // Проверяем наличие токена
+    const hasToken = !!localStorage.getItem('auth_token');
+    if (!hasToken) {
+        console.warn('⚠️ Нет токена авторизации, синхронизация невозможна');
+        return false;
+    }
+    
+    // Проверяем, что Firebase доступен
+    if (typeof firebase === 'undefined' || !firebase.database) {
+        console.error('❌ Firebase не доступен');
+        
+        // Пробуем инициализировать Firebase
+        try {
+            if (typeof ensureFirebaseInitialized === 'function') {
+                const result = ensureFirebaseInitialized();
+                if (result) {
+                    console.log('✅ Firebase инициализирован через ensureFirebaseInitialized');
+                } else {
+                    return false;
+                }
+            } else {
+                console.error('❌ ensureFirebaseInitialized не определена');
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ Ошибка инициализации Firebase:', error);
+            return false;
+        }
+    }
+    
+    try {
+        // Инициализируем FirebaseSync
+        if (typeof FirebaseSync !== 'undefined') {
+            console.log('🔄 Создаем экземпляр FirebaseSync...');
+            firebaseSync = new FirebaseSync();
+            
+            // Проверяем, что экземпляр создан и не в оффлайн-режиме
+            if (firebaseSync && !firebaseSync.isOffline && typeof firebaseSync.loadAllRecords === 'function') {
+                console.log('✅ FirebaseSync создан успешно');
+                firebaseInitialized = true;
+                return true;
+            } else {
+                console.warn('⚠️ FirebaseSync создан, но не готов к работе');
+                return false;
+            }
+        } else {
+            console.error('❌ FirebaseSync не определен');
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Ошибка инициализации FirebaseSync:', error);
+        return false;
+    }
+}
+
+// ============================================
+//  ФУНКЦИЯ ДЛЯ СИНХРОНИЗАЦИИ (исправленная)
+// ============================================
+
+async function syncLocalRecordsWithFirebase() {
+    console.log('🔄 Начинаем синхронизацию локальных записей...');
+    
+    // ✅ Проверяем firebaseSync
+    if (!firebaseSync || firebaseSync.isOffline || typeof firebaseSync.loadAllRecords !== 'function') {
+        console.warn('⚠️ FirebaseSync не готов для синхронизации');
+        // Пробуем инициализировать заново
+        const initialized = await initFirebaseForSync();
+        if (!initialized) {
+            throw new Error('Firebase не инициализирован');
+        }
+    }
+    
+    // ✅ Проверяем, что firebaseSync готов
+    if (!firebaseSync || firebaseSync.isOffline || typeof firebaseSync.loadAllRecords !== 'function') {
+        throw new Error('Firebase недоступен для синхронизации');
+    }
+    
+    const localRecords = getLocalRecords();
+    const conflicts = {};
+    const syncedRecords = {};
+    
+    // Получаем все записи из Firebase
+    console.log('📥 Загружаем записи из Firebase...');
+    let firebaseRecords = {};
+    try {
+        firebaseRecords = await firebaseSync.loadAllRecords();
+        console.log('📥 Загружено записей из Firebase:', Object.keys(firebaseRecords).length);
+    } catch (error) {
+        console.error('❌ Ошибка загрузки из Firebase:', error);
+        throw new Error('Не удалось загрузить данные из облака');
+    }
+    
+    const firebaseData = firebaseRecords || {};
+    
+    const user = getCurrentUser();
+    const currentUserId = user ? user.id : null;
+    const currentUserName = user ? user.name : null;
+    
+    // Перебираем локальные записи
+    for (const [dateKey, records] of Object.entries(localRecords)) {
+        if (!Array.isArray(records)) continue;
+        
+        for (const localRecord of records) {
+            if (localRecord._synced) continue;
+            
+            // Проверяем, есть ли такая запись в Firebase
+            const existingRecord = findMatchingRecord(firebaseData, dateKey, localRecord);
+            
+            if (existingRecord) {
+                // Запись существует в Firebase — проверяем на конфликт
+                if (isRecordConflict(existingRecord, localRecord)) {
+                    // Конфликт — сохраняем как конфликтную
+                    if (!conflicts[dateKey]) conflicts[dateKey] = [];
+                    conflicts[dateKey].push({
+                        ...localRecord,
+                        _firebaseId: existingRecord.id,
+                        _conflict: true
+                    });
+                } else {
+                    // Нет конфликта — объединяем
+                    const merged = mergeRecords(existingRecord, localRecord);
+                    await firebaseSync.updateRecord(existingRecord.id, dateKey, merged);
+                    localRecord._synced = true;
+                }
+            } else {
+                // Нет такой записи в Firebase — создаем новую
+                try {
+                    const newRecord = {
+                        ...localRecord,
+                        userId: currentUserId,
+                        master: currentUserName,
+                        masterId: currentUserId
+                    };
+                    delete newRecord._localId;
+                    delete newRecord._isLocal;
+                    delete newRecord._synced;
+                    
+                    await firebaseSync.addRecord(newRecord);
+                    localRecord._synced = true;
+                    
+                    // Добавляем уведомление
+                    addNotification('📤 Синхронизирована локальная запись: ' + localRecord.serviceTypeName + ' на ' + dateKey);
+                } catch (error) {
+                    console.error('❌ Ошибка синхронизации записи:', error);
+                }
+            }
+        }
+    }
+    
+    // Сохраняем конфликты
+    if (Object.keys(conflicts).length > 0) {
+        saveConflictRecords(conflicts);
+        showToast('⚠️ Обнаружены конфликты записей. Проверьте их в календаре.', 'error');
+    }
+    
+    // Сохраняем обновленные локальные записи
+    saveLocalRecords(localRecords);
+    
+    // Обновляем кеш
+    const allData = await firebaseSync.loadAllRecords();
+    saveRecordsToCache(allData);
+    
+    console.log('✅ Синхронизация завершена');
+    return { conflicts, synced: localRecords };
+}
+
+// ============================================
+//  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ СИНХРОНИЗАЦИИ
+// ============================================
+
+function findMatchingRecord(firebaseData, dateKey, localRecord) {
+    const dayRecords = firebaseData[dateKey] || [];
+    if (!Array.isArray(dayRecords)) return null;
+    
+    return dayRecords.find(r => {
+        const sameMaster = r.masterId === localRecord.masterId || r.master === localRecord.master;
+        const sameTime = Math.abs(r.startHour - localRecord.startHour) < 0.5 && 
+                        Math.abs(r.endHour - localRecord.endHour) < 0.5;
+        return sameMaster && sameTime;
+    }) || null;
+}
+
+function isRecordConflict(firebaseRecord, localRecord) {
+    if (firebaseRecord.masterId !== localRecord.masterId && 
+        firebaseRecord.master !== localRecord.master) {
+        return true;
+    }
+    
+    if (firebaseRecord.startHour !== localRecord.startHour || 
+        firebaseRecord.endHour !== localRecord.endHour) {
+        return true;
+    }
+    
+    return false;
+}
+
+function mergeRecords(firebaseRecord, localRecord) {
+    const merged = { ...firebaseRecord };
+    
+    const fieldsToMerge = ['clientName', 'clientPhone', 'note', 'serviceTypeName'];
+    for (const field of fieldsToMerge) {
+        if (!merged[field] && localRecord[field]) {
+            merged[field] = localRecord[field];
+        }
+    }
+    
+    if (!merged.masterId && localRecord.masterId) {
+        merged.masterId = localRecord.masterId;
+    }
+    
+    return merged;
+}
+
+function saveConflictRecords(conflicts) {
+    try {
+        const existing = JSON.parse(localStorage.getItem('conflict_records') || '{}');
+        for (const [dateKey, records] of Object.entries(conflicts)) {
+            if (!existing[dateKey]) existing[dateKey] = [];
+            existing[dateKey].push(...records);
+        }
+        localStorage.setItem('conflict_records', JSON.stringify(existing));
+    } catch (e) {
+        console.warn('⚠️ Ошибка сохранения конфликтов:', e);
+    }
+}
+
+// ============================================
+//  ЗАПИСИ (CRUD) - FIREBASE ВЕРСИЯ
+// ============================================
+
+async function loadRecords() {
+    if (loader) loader.style.display = 'none';
+    
+    // Проверяем оффлайн-режим
+    const isOffline = localStorage.getItem('offline_mode') === 'true';
+    
+    if (isOffline) {
+        console.log('📴 Оффлайн-режим: загружаем только локальные данные');
+        
+        // Загружаем локальные записи
+        let localRecords = {};
+        if (typeof getLocalRecords === 'function') {
+            localRecords = getLocalRecords();
+            console.log('📦 getLocalRecords вернул:', Object.keys(localRecords).length, 'дней');
+        } else {
+            try {
+                localRecords = JSON.parse(localStorage.getItem('local_records') || '{}');
+                console.log('📦 localStorage вернул:', Object.keys(localRecords).length, 'дней');
+            } catch (e) {
+                console.warn('⚠️ Ошибка загрузки локальных записей:', e);
+            }
+        }
+        
+        // ✅ СОХРАНЯЕМ В recordsData
+        recordsData = localRecords;
+        console.log('📦 recordsData содержит:', Object.keys(recordsData).length, 'дней');
+        
+        // ✅ ФОРСИРУЕМ РЕНДЕР КАЛЕНДАРЯ
+        renderCalendar();
+        
+        // Обновляем детальный режим, если открыт
+        if (detailContainer.style.display === 'block') {
+            const d = Detail.currentDay, 
+                m = Detail.currentMonth || currentMonth, 
+                y = Detail.currentYear || currentYear;
+            Detail.drawDetailTile(d, m, y, []);
+            Detail.updateRecordsList(d, m, y);
+            Detail.populateCarousel(d, m, y);
+        }
+        updateBadge();
+        console.log('✅ Оффлайн-загрузка завершена');
+        return;
+    }
+    
+    // ✅ ОНЛАЙН-РЕЖИМ: обычная загрузка
+    // 1. Показываем кеш
+    const cachedData = loadRecordsFromCache();
+    if (cachedData) {
+        recordsData = cachedData;
+        renderCalendar();
+        if (detailContainer.style.display === 'block') {
+            const d = Detail.currentDay, 
+                m = Detail.currentMonth || currentMonth, 
+                y = Detail.currentYear || currentYear;
+            Detail.drawDetailTile(d, m, y, []);
+            Detail.updateRecordsList(d, m, y);
+            Detail.populateCarousel(d, m, y);
+        }
+        updateBadge();
+        console.log('📦 Показаны данные из кеша');
+    }
+    
+    // 2. Загружаем свежие данные из Firebase
+    if (!firebaseInitialized) {
+        const initialized = await initFirebase();
+        if (!initialized) {
+            setTimeout(loadRecords, 2000);
+            return;
+        }
+    }
+    
+    try {
+        if (firebaseSync && !firebaseSync.isOffline) {
+            firebaseSync.syncRecords((data) => {
+                saveRecordsToCache(data);
+                const filteredData = filterRecordsForUser(data);
+                recordsData = filteredData;
+                renderCalendar();
+                if (detailContainer.style.display === 'block') {
+                    const d = Detail.currentDay, 
+                        m = Detail.currentMonth || currentMonth, 
+                        y = Detail.currentYear || currentYear;
+                    Detail.drawDetailTile(d, m, y, []);
+                    Detail.updateRecordsList(d, m, y);
+                    Detail.populateCarousel(d, m, y);
+                }
+                updateBadge();
+                console.log('🔄 Данные синхронизированы из Firebase');
             });
         }
     } catch (error) {
@@ -676,6 +1031,9 @@ async function loadRecords() {
         setTimeout(loadRecords, 2000);
     }
 }
+// ============================================
+//  СОХРАНЕНИЕ ЗАПИСИ
+// ============================================
 
 async function saveRecord(date, startHour, endHour, serviceTypeName, clientName, clientPhone, note, openLetter) {
     if (serviceTypeName === 'Выходной') {
@@ -683,11 +1041,25 @@ async function saveRecord(date, startHour, endHour, serviceTypeName, clientName,
         clientPhone = '';
     }
     
-    // ✅ ПРЕОБРАЗУЕМ ВРЕМЯ В ЧИСЛО (9.0, 9.5, 10.0, ...)
     const startHourNum = parseFloat(startHour);
     const endHourNum = parseFloat(endHour);
     
-    const serviceTypeId = getServiceIdByName(serviceTypeName);
+    // Получаем serviceTypeId
+    let serviceTypeId = null;
+    if (typeof getServiceIdByName === 'function') {
+        try {
+            serviceTypeId = getServiceIdByName(serviceTypeName);
+        } catch (e) {}
+    }
+    if (!serviceTypeId && typeof SERVICES !== 'undefined') {
+        for (const key of Object.keys(SERVICES)) {
+            if (SERVICES[key].name === serviceTypeName) {
+                serviceTypeId = SERVICES[key].id;
+                break;
+            }
+        }
+    }
+    if (!serviceTypeId) serviceTypeId = 'service_1';
     
     const user = getCurrentUser();
     const masterSelect = modalMasterName;
@@ -713,17 +1085,30 @@ async function saveRecord(date, startHour, endHour, serviceTypeName, clientName,
         master: masterName,
         masterId: masterId,
         userId: user ? user.id : 'unknown',
-        createdAt: firebase.database.ServerValue.TIMESTAMP
+        createdAt: Date.now()
     };
     
+    // Если редактируем существующую запись
     if (editingRecordId) {
         record.id = editingRecordId;
         try {
-            await firebaseSync.updateRecord(editingRecordId, date, record);
-            const allData = await firebaseSync.loadAllRecords();
-            recordsData = filterRecordsForUser(allData);
-            addNotification('✏️ Обновлена запись: ' + serviceTypeName + ' на ' + date + ' ' + startHour + ':00');
-            sendSystemNotification('Запись обновлена', serviceTypeName + ' на ' + date + ' ' + startHour + ':00');
+            if (firebaseSync && !firebaseSync.isOffline && typeof firebaseSync.updateRecord === 'function') {
+                await firebaseSync.updateRecord(editingRecordId, date, record);
+            } else {
+                console.log('📴 Оффлайн-режим: запись обновлена локально');
+                if (typeof updateLocalRecord === 'function') {
+                    updateLocalRecord(record);
+                }
+                // Обновляем recordsData
+                const dateKey = record.date;
+                if (recordsData[dateKey]) {
+                    const idx = recordsData[dateKey].findIndex(r => r.id === editingRecordId || r._localId === editingRecordId);
+                    if (idx !== -1) {
+                        recordsData[dateKey][idx] = { ...recordsData[dateKey][idx], ...record };
+                    }
+                }
+            }
+            
             renderCalendar();
             refreshDetail();
             closeModal();
@@ -737,18 +1122,57 @@ async function saveRecord(date, startHour, endHour, serviceTypeName, clientName,
         }
     }
     
+    // Новая запись
     try {
-        const id = await firebaseSync.addRecord(record);
+        let id;
+        const isOffline = localStorage.getItem('offline_mode') === 'true';
+        
+        if (isOffline || !firebaseSync || firebaseSync.isOffline) {
+            console.log('📴 Оффлайн-режим: сохраняем запись локально');
+            id = 'local_' + Date.now();
+            
+            // Сохраняем локально
+            if (typeof addLocalRecord === 'function') {
+                addLocalRecord(record);
+            }
+            
+            // Обновляем recordsData
+            const dateKey = record.date;
+            if (!recordsData[dateKey]) recordsData[dateKey] = [];
+            recordsData[dateKey].push({
+                ...record,
+                id: id,
+                _localId: id,
+                _isLocal: true
+            });
+            
+            // Форсируем рендер
+            renderCalendar();
+            refreshDetail();
+            updateBadge();
+            closeModal();
+            showToast(TEXTS.messages.recordSaved);
+            return;
+        }
+        
+        // Онлайн-режим
+        id = await firebaseSync.addRecord(record);
         record.id = id;
+        
         scheduleReminder(record);
         addNotification('📝 Добавлена запись: ' + serviceTypeName + ' на ' + date + ' ' + startHour + ':00');
         sendSystemNotification('Новая запись', serviceTypeName + ' на ' + date + ' ' + startHour + ':00');
+        
         const allData = await firebaseSync.loadAllRecords();
-        recordsData = filterRecordsForUser(allData);
+        saveRecordsToCache(allData);
+        const filteredData = filterRecordsForUser(allData);
+        recordsData = filteredData;
+        
         renderCalendar();
         refreshDetail();
         closeModal();
         showToast(TEXTS.messages.recordSaved);
+        
         if (openLetter && serviceTypeName !== 'Выходной') {
             setTimeout(() => openModalWithLetter(record), 300);
         }
@@ -758,19 +1182,159 @@ async function saveRecord(date, startHour, endHour, serviceTypeName, clientName,
     }
 }
 
+// ============================================
+//  ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ЗАГРУЗКИ ДАННЫХ
+// ============================================
+
+async function loadAllData() {
+    if (firebaseSync && !firebaseSync.isOffline && typeof firebaseSync.loadAllRecords === 'function') {
+        try {
+            return await firebaseSync.loadAllRecords();
+        } catch (e) {
+            console.warn('⚠️ Ошибка загрузки из Firebase:', e);
+        }
+    }
+    // Оффлайн-режим: возвращаем локальные записи
+    if (typeof getLocalRecords === 'function') {
+        return getLocalRecords();
+    }
+    try {
+        return JSON.parse(localStorage.getItem('local_records') || '{}');
+    } catch {
+        return {};
+    }
+}
+
+// ============================================
+//  ОБНОВЛЕНИЕ ЛОКАЛЬНОЙ ЗАПИСИ
+// ============================================
+
+function updateLocalRecord(record) {
+    try {
+        const localRecords = JSON.parse(localStorage.getItem('local_records') || '{}');
+        const dateKey = record.date;
+        if (localRecords[dateKey]) {
+            const idx = localRecords[dateKey].findIndex(r => r.id === record.id || r._localId === record.id);
+            if (idx !== -1) {
+                localRecords[dateKey][idx] = { ...localRecords[dateKey][idx], ...record };
+                localStorage.setItem('local_records', JSON.stringify(localRecords));
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ Не удалось обновить локальную запись:', e);
+    }
+}
+
+// ============================================
+//  ДОБАВЛЕНИЕ ЛОКАЛЬНОЙ ЗАПИСИ
+// ============================================
+
+function addLocalRecord(record) {
+    try {
+        const localRecords = JSON.parse(localStorage.getItem('local_records') || '{}');
+        const dateKey = record.date;
+        if (!localRecords[dateKey]) localRecords[dateKey] = [];
+        localRecords[dateKey].push({
+            ...record,
+            _localId: 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            _isLocal: true,
+            _synced: false
+        });
+        localStorage.setItem('local_records', JSON.stringify(localRecords));
+        console.log('💾 Запись сохранена локально');
+    } catch (e) {
+        console.warn('⚠️ Не удалось сохранить локально:', e);
+    }
+}
+
+// ============================================
+//  УДАЛЕНИЕ ЛОКАЛЬНОЙ ЗАПИСИ
+// ============================================
+
+function removeLocalRecord(dateKey, recordId) {
+    try {
+        const localRecords = JSON.parse(localStorage.getItem('local_records') || '{}');
+        if (localRecords[dateKey]) {
+            localRecords[dateKey] = localRecords[dateKey].filter(r => r.id !== recordId && r._localId !== recordId);
+            if (localRecords[dateKey].length === 0) {
+                delete localRecords[dateKey];
+            }
+            localStorage.setItem('local_records', JSON.stringify(localRecords));
+            console.log('🗑️ Запись удалена локально');
+        }
+    } catch (e) {
+        console.warn('⚠️ Не удалось удалить локально:', e);
+    }
+}
+
+// ============================================
+//  УДАЛЕНИЕ ЗАПИСИ
+// ============================================
+
 async function deleteRecordFromDB(id, dateKey, serviceType) {
     if (!confirm(TEXTS.messages.deleteConfirm)) return;
     
+    console.log('🗑️ deleteRecordFromDB:', { id, dateKey, serviceType });
+    
+    const isOffline = localStorage.getItem('offline_mode') === 'true';
+    
     try {
+        if (isOffline || !firebaseSync || firebaseSync.isOffline) {
+            console.log('📴 Оффлайн-режим: удаляем запись локально');
+            
+            // Удаляем из локального хранилища
+            if (typeof removeLocalRecord === 'function') {
+                removeLocalRecord(dateKey, id);
+            } else {
+                // Fallback: удаляем из localStorage напрямую
+                try {
+                    const localRecords = JSON.parse(localStorage.getItem('local_records') || '{}');
+                    if (localRecords[dateKey]) {
+                        localRecords[dateKey] = localRecords[dateKey].filter(r => r.id !== id && r._localId !== id);
+                        if (localRecords[dateKey].length === 0) {
+                            delete localRecords[dateKey];
+                        }
+                        localStorage.setItem('local_records', JSON.stringify(localRecords));
+                        console.log('🗑️ Запись удалена из localStorage');
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Не удалось удалить из localStorage:', e);
+                }
+            }
+            
+            // Обновляем recordsData
+            if (recordsData[dateKey]) {
+                recordsData[dateKey] = recordsData[dateKey].filter(r => r.id !== id && r._localId !== id);
+                if (recordsData[dateKey].length === 0) {
+                    delete recordsData[dateKey];
+                }
+                console.log('🗑️ recordsData обновлен');
+            }
+            
+            // ✅ ОБНОВЛЯЕМ UI
+            renderCalendar();
+            refreshDetail();
+            updateBadge();
+            closeModal();
+            showToast(TEXTS.messages.recordDeleted);
+            return;
+        }
+        
+        // Онлайн-режим: удаляем из Firebase
+        console.log('🌐 Онлайн-режим: удаляем из Firebase');
         await firebaseSync.deleteRecord(id, dateKey);
+        
+        // Обновляем данные
         const allData = await firebaseSync.loadAllRecords();
-        recordsData = filterRecordsForUser(allData);
-        addNotification('🗑️ Удалена запись: ' + serviceType);
-        sendSystemNotification('Запись удалена', serviceType + ' удалена');
+        saveRecordsToCache(allData);
+        const filteredData = filterRecordsForUser(allData);
+        recordsData = filteredData;
+        
         renderCalendar();
         refreshDetail();
         closeModal();
         showToast(TEXTS.messages.recordDeleted);
+        
     } catch (error) {
         console.error('❌ Ошибка удаления:', error);
         showToast(TEXTS.messages.recordLoadError, 'error');
@@ -779,7 +1343,12 @@ async function deleteRecordFromDB(id, dateKey, serviceType) {
 
 function refreshDetail() {
     if (detailContainer.style.display === 'block') {
-        Detail.show(Detail.currentDay, currentMonth, currentYear);
+        const d = Detail.currentDay, 
+            m = Detail.currentMonth || currentMonth, 
+            y = Detail.currentYear || currentYear;
+        Detail.drawDetailTile(d, m, y, []);
+        Detail.updateRecordsList(d, m, y);
+        Detail.populateCarousel(d, m, y); // ✅ ДОБАВЛЯЕМ ОБНОВЛЕНИЕ КАРУСЕЛИ
     }
 }
 
@@ -801,6 +1370,8 @@ function openModalWithLetter(record) {
 // ============================================
 
 function updateModalState(record) {
+    console.log('🔄 updateModalState вызван, record:', record ? 'есть' : 'нет');
+    
     let isEditable = false;
     let showLetters = false;
     let showDelete = false;
@@ -815,10 +1386,13 @@ function updateModalState(record) {
         isEditable = (isOwn || isAdmin) && !isReadOnly;
         showLetters = isEditable && record.serviceTypeName !== 'Выходной' && record.serviceType !== 'Выходной';
         showDelete = isEditable;
+        
+        console.log('📝 updateModalState: isOwn=', isOwn, 'isAdmin=', isAdmin, 'isReadOnly=', isReadOnly, 'isEditable=', isEditable);
     } else {
         isEditable = true;
         showLetters = true;
         showDelete = false;
+        console.log('📝 updateModalState: новая запись, isEditable=true');
     }
     
     modalService.disabled = !isEditable;
@@ -838,12 +1412,17 @@ function updateModalState(record) {
     }
     
     modalSave.style.display = isEditable ? 'block' : 'none';
+    modalSave.disabled = false;
     modalDeleteTopBtn.style.display = showDelete ? 'block' : 'none';
     
     modalOverlay.dataset.isEditable = isEditable ? 'true' : 'false';
+    console.log('✅ updateModalState завершен');
 }
 
 function resetModalState() {
+    console.log('🔄 resetModalState вызван');
+    
+    // Блокируем поля
     modalService.disabled = true;
     modalStartHour.disabled = true;
     modalEndHour.disabled = true;
@@ -856,12 +1435,16 @@ function resetModalState() {
     modalTabLetter.style.opacity = '0.5';
     
     modalSave.style.display = 'none';
+    modalSave.disabled = false;
     modalDeleteTopBtn.style.display = 'none';
     
     delete modalOverlay.dataset.deleteId;
     delete modalOverlay.dataset.deleteDate;
     delete modalOverlay.dataset.deleteService;
     modalOverlay.dataset.isEditable = 'false';
+    
+    editingRecordId = null;
+    console.log('✅ resetModalState завершен');
 }
 
 // ============================================
@@ -997,7 +1580,7 @@ function buildCalendarHTML() {
         const isPast = isDayPast(currentYear, currentMonth, d);
         html += `<div class="day-cell" style="position:relative;aspect-ratio:1;width:100%;">
             <canvas id="day_${d}" width="120" height="120" style="width:100%;height:100%;cursor:pointer;border-radius:50%;display:block;"></canvas>
-            ${isPast ? `<div style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;background:rgba(200,200,200,0.3);pointer-events:none;"></div>` : ''}
+            ${isPast ? `<div style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;background:rgba(255, 255, 255, 0.7);pointer-events:none;"></div>` : ''}
         </div>`;
     }
     html += `</div>`;
@@ -1023,10 +1606,10 @@ function drawTile(canvas, day, isPast) {
     // Внешний круг (фон)
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI*2);
-    ctx.fillStyle = isPast ? '#F0F0F0' : '#FFFDF9';
+    ctx.fillStyle = isPast ? 'rgba(255, 239, 239, 0.19)' : '#FFFDF9';
     ctx.fill();
-    ctx.strokeStyle = '#E0F2F1';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = isPast ? 'rgba(0, 0, 0, 0.88)' : '#000000';
+    ctx.lineWidth = 3;
     ctx.stroke();
     
     const dateKey = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(day).padStart(2,'0');
@@ -1034,11 +1617,14 @@ function drawTile(canvas, day, isPast) {
     if (!Array.isArray(dayRecords)) {
         dayRecords = Object.values(dayRecords);
     }
+    
+    // Фильтруем дубликаты
     if (Array.isArray(dayRecords) && dayRecords.length > 0) {
         const seen = new Set();
         dayRecords = dayRecords.filter(record => {
-            if (record.id && !seen.has(record.id)) {
-                seen.add(record.id);
+            const id = record.id || record._localId;
+            if (id && !seen.has(id)) {
+                seen.add(id);
                 return true;
             }
             return false;
@@ -1058,18 +1644,12 @@ function drawTile(canvas, day, isPast) {
             const startFloor = Math.floor(r.startHour);
             const endFloor = Math.floor(r.endHour);
             if (hour >= startFloor && hour < endFloor) {
-                // ✅ ЕСЛИ ЗАПИСЬ "ВЫХОДНОЙ" И АКТИВЕН ФИЛЬТР "СВОБОДНЫЕ" — НЕ СЧИТАЕМ ЗАНЯТОЙ
-                const isWeekend = (r.serviceTypeName === 'Выходной' || r.serviceType === 'Выходной');
-                if (isWeekend && showFreeSlots) {
-                    // Пропускаем — не считаем занятым
-                    continue;
-                }
                 isBooked = true;
                 const serviceName = r.serviceTypeName || r.serviceType || '';
                 isOwn = currentUserId && r.masterId === currentUserId;
                 color = isOwn ? getServiceColor(serviceName) : getUIColor('Чужие записи');
                 serviceTypeName = serviceName;
-                recordId = r.id;
+                recordId = r.id || r._localId;
                 break;
             }
         }
@@ -1156,12 +1736,12 @@ function drawTile(canvas, day, isPast) {
                 
                 if (totalFree >= 2) {
                     fillColor = getUIColor('Свободные слоты');
-                    strokeColor = '#388E3C';
+                    strokeColor = isPast ? 'rgba(224, 242, 241, 0.93)' : '#E0F2F1';
                     isGreen = true;
                     isGray = false;
                 } else {
                     fillColor = 'transparent';
-                    strokeColor = isPast ? '#E8E8E8' : '#E0F2F1';
+                    strokeColor = isPast ? 'rgba(224, 242, 241, 0.9)' : '#E0F2F1';
                     isGreen = false;
                     isGray = false;
                 }
@@ -1235,9 +1815,9 @@ function drawTile(canvas, day, isPast) {
     // Внутренний круг поверх секторов (всегда белый)
     ctx.beginPath();
     ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = isPast ? 'rgba(255, 253, 249, 0.5)' : '#FFFFFF';
     ctx.fill();
-    ctx.strokeStyle = '#E0F2F1';
+    ctx.strokeStyle = isPast ? 'rgba(55, 71, 79, 0.3)' : '#37474F';
     ctx.lineWidth = 0.5;
     ctx.stroke();
     
@@ -1342,9 +1922,14 @@ function initFilters() {
 // ============================================
 
 function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
-    if (!modalOverlay) return;
+    console.log('📝 openModal вызван:', { day, month, year, recordId, isReadOnly });
     
-    // ✅ СБРАСЫВАЕМ СОСТОЯНИЕ ПЕРЕД ОТКРЫТИЕМ
+    if (!modalOverlay) {
+        console.error('❌ modalOverlay не найден!');
+        return;
+    }
+    
+    // Сбрасываем состояние
     resetModalState();
     
     editingRecordId = recordId || null;
@@ -1352,24 +1937,35 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     const isNew = !recordId;
     const readOnly = isReadOnly || false;
     
+    console.log('📝 dateKey:', dateKey, 'isNew:', isNew);
+    
     let record = null;
     let isDayOff = false;
     
     if (recordId) {
-        const dayRecords = recordsData[dateKey] || [];
-        record = dayRecords.find(r => String(r.id) === String(recordId));
+        record = getRecordById(dateKey, recordId);
+        console.log('🔍 Найдена запись:', record);
+        
         if (record && (record.serviceTypeName === 'Выходной' || record.serviceType === 'Выходной')) {
             isDayOff = true;
         }
         if (record) {
             record._readOnly = readOnly;
+        } else {
+            console.warn('⚠️ Запись не найдена:', recordId, 'в', dateKey);
+            console.log('📊 Доступные записи:', recordsData[dateKey]);
+            editingRecordId = null;
         }
     }
     
+    // Загружаем мастеров
+    console.log('📋 Загружаем мастеров...');
     loadMastersList();
     
-    modalTitle.textContent = isNew ? TEXTS.titles.newRecord : (readOnly ? TEXTS.titles.viewRecord : TEXTS.titles.editRecord);
+    modalTitle.textContent = isNew || !record ? TEXTS.titles.newRecord : (readOnly ? TEXTS.titles.viewRecord : TEXTS.titles.editRecord);
     modalDate.textContent = formatModalDate(dateKey);
+    
+    console.log('📝 Заголовок:', modalTitle.textContent);
     
     function toggleClientFields(serviceType) {
         const isDayOffField = serviceType === 'Выходной';
@@ -1387,6 +1983,7 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     }
     
     if (recordId && record) {
+        console.log('📝 Заполняем поля из записи');
         let serviceName = record.serviceTypeName || record.serviceType || '';
         if (record.serviceTypeId) {
             const service = getServiceById(record.serviceTypeId);
@@ -1395,40 +1992,59 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
             }
         }
         
-        // ✅ ПРЕОБРАЗУЕМ ВРЕМЯ В ФОРМАТ "9.0" или "9.5"
-        const startHourStr = record.startHour !== undefined ? record.startHour.toFixed(1) : '9.0';
-        const endHourStr = record.endHour !== undefined ? record.endHour.toFixed(1) : '10.0';
-        
         modalService.value = serviceName || SERVICE_KEYS[0];
-        modalStartHour.value = startHourStr;
-        modalEndHour.value = endHourStr;
+        modalStartHour.value = record.startHour !== undefined ? record.startHour.toFixed(1) : '9.0';
+        modalEndHour.value = record.endHour !== undefined ? record.endHour.toFixed(1) : '10.0';
         modalClientName.value = record.clientName || '';
         modalClientPhone.value = record.clientPhone || '';
         modalNote.value = record.note || '';
         
-        // Устанавливаем мастера из записи
+        // ✅ УСТАНАВЛИВАЕМ МАСТЕРА ИЗ ЗАПИСИ, А НЕ ТЕКУЩЕГО ПОЛЬЗОВАТЕЛЯ
         const masterName = record.master || '';
+        console.log('📝 Мастер из записи:', masterName);
+        
         if (masterName) {
-            let found = false;
-            for (let i = 0; i < modalMasterName.options.length; i++) {
-                if (modalMasterName.options[i].value === masterName) {
-                    modalMasterName.selectedIndex = i;
-                    found = true;
-                    break;
+            // Ждем загрузки списка мастеров
+            setTimeout(function() {
+                let found = false;
+                for (let i = 0; i < modalMasterName.options.length; i++) {
+                    if (modalMasterName.options[i].value === masterName) {
+                        modalMasterName.selectedIndex = i;
+                        found = true;
+                        console.log('✅ Мастер найден в списке:', masterName);
+                        break;
+                    }
                 }
-            }
-            if (!found) {
-                const option = document.createElement('option');
-                option.value = masterName;
-                option.textContent = masterName;
-                modalMasterName.appendChild(option);
-                modalMasterName.value = masterName;
-            }
+                
+                if (!found) {
+                    // Если мастера нет в списке, добавляем его
+                    console.log('⚠️ Мастер не найден в списке, добавляем:', masterName);
+                    const option = document.createElement('option');
+                    option.value = masterName;
+                    option.textContent = masterName;
+                    if (record.masterId) {
+                        option.dataset.userId = record.masterId;
+                    }
+                    modalMasterName.appendChild(option);
+                    modalMasterName.value = masterName;
+                }
+            }, 100);
         } else {
-            modalMasterName.value = '';
+            // Если в записи нет мастера, используем текущего пользователя
+            const user = getCurrentUser();
+            if (user && user.name) {
+                setTimeout(function() {
+                    for (let i = 0; i < modalMasterName.options.length; i++) {
+                        if (modalMasterName.options[i].value === user.name) {
+                            modalMasterName.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }, 100);
+            }
         }
         
-        modalOverlay.dataset.deleteId = String(record.id);
+        modalOverlay.dataset.deleteId = String(record.id || record._localId);
         modalOverlay.dataset.deleteDate = record.date;
         modalOverlay.dataset.deleteService = record.serviceTypeName || record.serviceType || '';
         
@@ -1442,7 +2058,7 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         updateModalState(record);
         
     } else {
-        // Новая запись
+        console.log('📝 Заполняем поля для новой записи');
         modalService.value = SERVICE_KEYS[0];
         modalStartHour.value = selectedRange ? selectedRange.start + '.0' : '9.0';
         modalEndHour.value = selectedRange ? (selectedRange.end) + '.0' : '10.0';
@@ -1453,9 +2069,17 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
         toggleClientFields(SERVICE_KEYS[0]);
         updateEndHourOptions(selectedRange ? selectedRange.start : 9);
         
+        // ✅ Для новой записи устанавливаем текущего пользователя
         const user = getCurrentUser();
         if (user && user.name && modalMasterName) {
-            modalMasterName.value = user.name;
+            setTimeout(function() {
+                for (let i = 0; i < modalMasterName.options.length; i++) {
+                    if (modalMasterName.options[i].value === user.name) {
+                        modalMasterName.selectedIndex = i;
+                        break;
+                    }
+                }
+            }, 100);
         }
         
         updateModalState(null);
@@ -1463,8 +2087,12 @@ function openModal(day, month, year, selectedRange, recordId, isReadOnly) {
     
     modalLoading.style.display = 'none';
     modalSave.disabled = false;
+    
+    console.log('📝 Показываем модалку');
     modalOverlay.style.display = 'flex';
     modalOverlay.dataset.date = dateKey;
+    
+    console.log('✅ openModal завершен');
 }
 
 function updateEndHourOptions(startHour) {
@@ -1708,247 +2336,7 @@ function initModal() {
 //  НАСТРОЙКИ
 // ============================================
 
-function openSettings() {
-    settingsModal.style.display = 'flex';
-    switchSettingsTab('general');
-    renderCleanupSettings();
-    renderLogoutButton();
-    renderSettingsColors();
-    updateAdminSliderUI();
-    
-    const editBtn = settingsTemplateEdit;
-    if (editBtn) {
-        const newBtn = editBtn.cloneNode(true);
-        editBtn.parentNode.replaceChild(newBtn, editBtn);
-        newBtn.addEventListener('click', () => {
-            editingTemplateType = 'new';
-            openTemplateEditor('Шаблон новой записи', templateText);
-        });
-    }
-    
-    const confirmEditBtn = settingsConfirmTemplateEdit;
-    if (confirmEditBtn) {
-        const newBtn = confirmEditBtn.cloneNode(true);
-        confirmEditBtn.parentNode.replaceChild(newBtn, confirmEditBtn);
-        newBtn.addEventListener('click', () => {
-            editingTemplateType = 'confirm';
-            openTemplateEditor('Шаблон подтверждения записи', confirmTemplateText);
-        });
-    }
-    
-    const tabGeneral = document.getElementById('settingsTabGeneral');
-    const tabColors = document.getElementById('settingsTabColors');
-    
-    if (tabGeneral) {
-        const newTabGeneral = tabGeneral.cloneNode(true);
-        tabGeneral.parentNode.replaceChild(newTabGeneral, tabGeneral);
-        newTabGeneral.addEventListener('click', () => switchSettingsTab('general'));
-    }
-    
-    if (tabColors) {
-        const newTabColors = tabColors.cloneNode(true);
-        tabColors.parentNode.replaceChild(newTabColors, tabColors);
-        newTabColors.addEventListener('click', () => switchSettingsTab('colors'));
-    }
-    
-    const saveColorsBtn = settingsColorsSave;
-    if (saveColorsBtn) {
-        const newBtn = saveColorsBtn.cloneNode(true);
-        saveColorsBtn.parentNode.replaceChild(newBtn, saveColorsBtn);
-        newBtn.addEventListener('click', saveAllColors);
-    }
-}
-
-function switchSettingsTab(tab) {
-    const tabGeneral = document.getElementById('settingsTabGeneral');
-    const tabColors = document.getElementById('settingsTabColors');
-    const contentGeneral = document.getElementById('settingsTabGeneralContent');
-    const contentColors = document.getElementById('settingsTabColorsContent');
-    
-    if (tab === 'general') {
-        tabGeneral.className = 'settings-tab active';
-        tabGeneral.style.color = '#008080';
-        tabGeneral.style.borderBottomColor = '#008080';
-        tabColors.className = 'settings-tab';
-        tabColors.style.color = '#7B8D8E';
-        tabColors.style.borderBottomColor = 'transparent';
-        contentGeneral.style.display = 'block';
-        contentColors.style.display = 'none';
-    } else {
-        tabGeneral.className = 'settings-tab';
-        tabGeneral.style.color = '#7B8D8E';
-        tabGeneral.style.borderBottomColor = 'transparent';
-        tabColors.className = 'settings-tab active';
-        tabColors.style.color = '#008080';
-        tabColors.style.borderBottomColor = '#008080';
-        contentGeneral.style.display = 'none';
-        contentColors.style.display = 'block';
-    }
-}
-
-function renderSettingsColors() {
-    if (!settingsColorsContainer) return;
-    
-    let html = '';
-    SERVICE_KEYS.forEach(key => {
-        const service = SERVICES[key];
-        html += `
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
-                <label style="flex:1;font-size:13px;font-weight:500;">${service.displayName}</label>
-                <input type="color" value="${service.color}" data-service-id="${service.id}" style="width:44px;height:36px;border:none;padding:0;cursor:pointer;border-radius:6px;">
-            </div>
-        `;
-    });
-    settingsColorsContainer.innerHTML = html;
-    
-    if (!settingsUIColorsContainer) return;
-    
-    let uiHtml = '';
-    Object.entries(UI_COLORS).forEach(([key, data]) => {
-        uiHtml += `
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
-                <label style="flex:1;font-size:13px;font-weight:500;">${data.displayName}</label>
-                <input type="color" value="${data.color}" data-category="ui" data-key="${key}" style="width:44px;height:36px;border:none;padding:0;cursor:pointer;border-radius:6px;">
-            </div>
-        `;
-    });
-    settingsUIColorsContainer.innerHTML = uiHtml;
-}
-
-function saveAllColors() {
-    document.querySelectorAll('#settingsColorsContainer input[data-service-id]').forEach(inp => {
-        const serviceId = inp.dataset.serviceId;
-        const service = getServiceById(serviceId);
-        if (service) {
-            service.color = inp.value;
-        }
-    });
-    
-    document.querySelectorAll('#settingsUIColorsContainer input[data-category="ui"]').forEach(inp => {
-        UI_COLORS[inp.dataset.key].color = inp.value;
-    });
-    
-    const colors = {};
-    SERVICE_KEYS.forEach(key => {
-        const service = SERVICES[key];
-        colors[service.id] = service.color;
-    });
-    colors._ui = {};
-    Object.entries(UI_COLORS).forEach(([key, data]) => {
-        colors._ui[key] = data.color;
-    });
-    
-    saveSettings(colors);
-    renderCalendar();
-    refreshDetail();
-    updateFilterColors();
-    showToast(TEXTS.messages.settingsSaved);
-}
-
-function renderCleanupSettings() {
-    if (!settingsCleanupContainer) return;
-    const days = getCleanupDays();
-    settingsCleanupContainer.innerHTML = `
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <label style="font-size:13px;color:#7B8D8E;flex-shrink:0;">Очищать историю через (дней):</label>
-            <input type="number" id="settingsCleanupDays" class="form-control" style="width:80px;padding:6px 10px;" value="${days}" min="1" max="365">
-            <button id="settingsCleanupNow" class="btn btn-danger" style="padding:6px 16px;background:#C62828;color:#FFF;border:none;border-radius:8px;cursor:pointer;">Очистить сейчас</button>
-        </div>
-        <div style="font-size:11px;color:#7B8D8E;margin-top:4px;">Будут удалены записи, шаблоны окошек и уведомления старше указанного количества дней</div>
-    `;
-    
-    const daysInput = document.getElementById('settingsCleanupDays');
-    if (daysInput) {
-        daysInput.addEventListener('change', function() {
-            const val = parseInt(this.value);
-            if (val > 0 && val <= 365) {
-                localStorage.setItem(STORAGE_KEYS.CLEANUP_DAYS, String(val));
-                showToast('✅ Срок очистки сохранен: ' + val + ' дней');
-            } else {
-                this.value = getCleanupDays();
-                showToast('❌ Введите число от 1 до 365', 'error');
-            }
-        });
-    }
-    
-    const nowBtn = document.getElementById('settingsCleanupNow');
-    if (nowBtn) {
-        nowBtn.addEventListener('click', function() {
-            if (confirm('Удалить все записи, шаблоны окошек и уведомления старше ' + getCleanupDays() + ' дней?')) {
-                performCleanup();
-                showToast(TEXTS.messages.cleanupDone);
-                closeSettings();
-            }
-        });
-    }
-}
-
-function performCleanup() {
-    const days = getCleanupDays();
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-    const cutoffTime = cutoff.getTime();
-    
-    getAllRecords().then(records => {
-        const toDelete = records.filter(r => new Date(r.date).getTime() < cutoffTime);
-        toDelete.forEach(r => deleteRecord(r.id));
-        for (const [key, recs] of Object.entries(recordsData)) {
-            recordsData[key] = recs.filter(r => new Date(r.date).getTime() >= cutoffTime);
-            if (recordsData[key].length === 0) delete recordsData[key];
-        }
-        const monthKey = getMonthKey();
-        for (const key of Object.keys(localStorage)) {
-            if (key.startsWith(STORAGE_KEYS.TEMPLATE_PREFIX) && key !== STORAGE_KEYS.TEMPLATE_PREFIX + monthKey) {
-                const m = key.replace(STORAGE_KEYS.TEMPLATE_PREFIX, '');
-                const [y, mo] = m.split('-').map(Number);
-                if (new Date(y, mo - 1, 1).getTime() < cutoffTime) {
-                    localStorage.removeItem(key);
-                }
-            }
-        }
-        renderCalendar();
-        updateBadge();
-        showToast(TEXTS.messages.cleanupComplete);
-    });
-}
-
-function closeSettings() {
-    settingsModal.style.display = 'none';
-}
-
-function renderLogoutButton() {
-    if (!settingsLogoutContainer) return;
-    const user = getCurrentUser();
-    settingsLogoutContainer.innerHTML = `
-        <div style="padding:12px 0;border-top:1px solid #E0F2F1;margin-top:8px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <div>
-                    <div style="font-weight:500;color:#37474F;">👤 ${user ? user.name : 'Пользователь'}</div>
-                    <div style="font-size:12px;color:#7B8D8E;">${user ? user.phone : ''}</div>
-                </div>
-                <button id="settingsLogoutBtn" class="btn btn-danger" style="padding:6px 16px;background:#C62828;color:#FFF;border:none;border-radius:8px;cursor:pointer;">🚪 Выйти</button>
-            </div>
-        </div>
-    `;
-    
-    const logoutBtn = document.getElementById('settingsLogoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', function() {
-            if (confirm(TEXTS.messages.logoutConfirm)) {
-                logout();
-            }
-        });
-    }
-}
-
-function initSettings() {
-    settingsBtn.addEventListener('click', openSettings);
-    settingsCloseBtn.addEventListener('click', closeSettings);
-    settingsModal.addEventListener('click', e => { if (e.target === e.currentTarget) closeSettings(); });
-}
-
 function openTemplateEditor(title, text) {
-    closeSettings();
     templateEditorTitle.textContent = '✏️ ' + title;
     templateEditorText.value = text;
     templateEditorModal.style.display = 'flex';
@@ -1984,69 +2372,6 @@ function initTemplateEditor() {
     document.querySelectorAll('[data-var]').forEach(btn => {
         btn.addEventListener('click', () => insertVariable(btn.dataset.var));
     });
-}
-
-// ============================================
-//  СТАТИСТИКА
-// ============================================
-
-function showStats() {
-    if (!statsModal) return;
-    const now = new Date();
-    statsDateFrom.value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    statsDateTo.value = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    statsModal.style.display = 'flex';
-    renderStats();
-}
-
-function renderStats() {
-    if (!statsContent) return;
-    const from = statsDateFrom.value;
-    const to = statsDateTo.value;
-    if (!from || !to) { statsContent.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">Выберите период</p>'; return; }
-    
-    const fromDate = new Date(from), toDate = new Date(to);
-    toDate.setHours(23,59,59,999);
-    const stats = {};
-    SERVICE_KEYS.forEach(key => {
-        const service = SERVICES[key];
-        stats[service.name] = 0;
-    });
-    let total = 0;
-    
-    for (const [dateKey, records] of Object.entries(recordsData)) {
-        const d = new Date(dateKey);
-        if (d >= fromDate && d <= toDate) {
-            records.forEach(r => {
-                const serviceName = r.serviceTypeName || r.serviceType || '';
-                if (stats[serviceName] !== undefined) {
-                    stats[serviceName]++;
-                    total++;
-                }
-            });
-        }
-    }
-    
-    if (total === 0) { statsContent.innerHTML = '<p style="color:#7B8D8E;text-align:center;padding:20px;">' + TEXTS.titles.noRecords + '</p>'; return; }
-    
-    const maxCount = Math.max(...Object.values(stats));
-    let html = '<div style="margin-bottom:12px;text-align:center;font-size:14px;color:#37474F;">Всего записей: <strong>' + total + '</strong></div>';
-    for (const [serviceName, count] of Object.entries(stats)) {
-        if (serviceName === 'Выходной') continue;
-        const percent = maxCount > 0 ? (count / maxCount * 100) : 0;
-        const color = getServiceColor(serviceName);
-        html += '<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:3px;"><span>' + serviceName + '</span><span>' + count + '</span></div>' +
-            '<div style="height:24px;background:#F0F0F0;border-radius:12px;overflow:hidden;"><div style="height:100%;width:' + percent + '%;background:' + color + ';border-radius:12px;transition:width 0.5s ease;"></div></div></div>';
-    }
-    statsContent.innerHTML = html;
-}
-
-function initStats() {
-    statsBtn.addEventListener('click', showStats);
-    statsCloseBtn.addEventListener('click', () => statsModal.style.display = 'none');
-    statsModal.addEventListener('click', e => { if (e.target === e.currentTarget) e.target.style.display = 'none'; });
-    statsDateFrom.addEventListener('change', renderStats);
-    statsDateTo.addEventListener('change', renderStats);
 }
 
 // ============================================
@@ -2164,7 +2489,10 @@ const Detail = {
                 const tile = document.createElement('div');
                 tile.className = 'day-tile';
                 const isPast = isDayPast(y, m, d);
-                if (isPast) { tile.style.background = '#F5F5F5'; tile.style.borderRadius = '50%'; }
+                if (isPast) {
+                    tile.style.background = 'rgb(255, 253, 249)';
+                    tile.style.borderRadius = '50%';
+                }
                 
                 const canvas = document.createElement('canvas');
                 canvas.width = 120;
@@ -2178,9 +2506,9 @@ const Detail = {
                 // Внешний круг
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI*2);
-                ctx.fillStyle = isPast ? '#F5F5F5' : '#FFFDF9';
+                ctx.fillStyle = isPast ? 'rgba(255, 253, 249, 0.99)' : '#FFFDF9';
                 ctx.fill();
-                ctx.strokeStyle = '#E0F2F1';
+                ctx.strokeStyle = isPast ? 'rgba(224, 242, 241, 0.93)' : '#E0F2F1';
                 ctx.lineWidth = 1;
                 ctx.stroke();
                 
@@ -2248,9 +2576,9 @@ const Detail = {
                     if (isBooked) {
                         const fillColor = isOwn ? color : getUIColor('Чужие записи');
                         const strokeColor = isOwn ? color : getUIColor('Чужие записи');
-                        ctx.fillStyle = isPast ? color : fillColor;
+                        ctx.fillStyle = isPast ? fillColor + '80' : fillColor;
                         ctx.fill();
-                        ctx.strokeStyle = isPast ? color : strokeColor;
+                        ctx.strokeStyle = isPast ? strokeColor + '80' : strokeColor;
                         ctx.lineWidth = 1.5;
                         ctx.stroke();
                         
@@ -2274,7 +2602,7 @@ const Detail = {
                     } else {
                         ctx.fillStyle = 'transparent';
                         ctx.fill();
-                        ctx.strokeStyle = isPast ? '#E8E8E8' : '#E0F2F1';
+                        ctx.strokeStyle = isPast ? 'rgba(224, 242, 241, 0.93)' : '#E0F2F1';
                         ctx.lineWidth = 0.5;
                         ctx.stroke();
                     }
@@ -2283,16 +2611,16 @@ const Detail = {
                 // Внутренний круг
                 ctx.beginPath();
                 ctx.arc(cx, cy, innerRadius, 0, Math.PI*2);
-                ctx.fillStyle = '#FFFFFF';
+                ctx.fillStyle = isPast ? 'rgba(255, 253, 249, 0.93)' : '#FFFFFF';
                 ctx.fill();
-                ctx.strokeStyle = '#E0F2F1';
+                ctx.strokeStyle = isPast ? 'rgba(224, 242, 241, 0.93)' : '#E0F2F1';
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
                 
                 // Цифра дня
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillStyle = isPast ? '#A0A0A0' : '#37474F';
+                ctx.fillStyle = isPast ? 'rgba(55, 71, 79, 0.3)' : '#37474F';
                 ctx.font = '600 ' + (size * 0.35) + 'px Montserrat, sans-serif';
                 ctx.fillText(d, cx, cy + 2);
                 
@@ -2300,6 +2628,9 @@ const Detail = {
                 const label = document.createElement('div');
                 label.className = 'day-label';
                 label.textContent = TEXTS.weekdays[new Date(y, m - 1, d).getDay()];
+                if (isPast) {
+                    label.style.color = 'rgba(255, 255, 255, 0.86)';
+                }
                 wrapper.appendChild(tile);
                 wrapper.appendChild(label);
                 
@@ -2488,7 +2819,6 @@ const Detail = {
             const li = document.createElement('li');
             li.style.cssText = `padding:8px 12px;margin-bottom:4px;background:${bgColor};border-radius:8px;cursor:pointer;transition:background 0.2s;border-left:4px solid ${borderColor};`;
             
-            // ✅ ФОРМАТИРУЕМ ВРЕМЯ
             const startHourFormatted = formatTime(record.startHour);
             const endHourFormatted = formatTime(record.endHour);
             
@@ -2503,11 +2833,17 @@ const Detail = {
             }
             if (canEdit && record.note) info += '<br><span style="font-size:11px;color:#7B8D8E;margin-left:6px;">📝 ' + record.note + '</span>';
             li.innerHTML = info;
-            li.addEventListener('click', () => {
+            
+            // ✅ ПЕРЕДАЕМ ПРАВИЛЬНЫЙ ID
+            const recordId = record.id || record._localId;
+            console.log('📝 Создаем элемент списка, recordId:', recordId, 'record:', record);
+            
+            li.addEventListener('click', function() {
+                console.log('🖱️ Клик по записи, recordId:', recordId);
                 if (canEdit) {
-                    openModal(day, month, year, null, record.id, false);
+                    openModal(day, month, year, null, recordId, false);
                 } else {
-                    openModal(day, month, year, null, record.id, true);
+                    openModal(day, month, year, null, recordId, true);
                 }
             });
             li.addEventListener('mouseenter', function() { this.style.background = canEdit ? color + '50' : getUIColor('Чужие записи') + '30'; });
@@ -2704,6 +3040,11 @@ function initDetailCanvas() {
         return null;
     }
     
+// ============================================
+//  ОБРАБОТЧИК КЛИКА ПО ЦИФЕРБЛАТУ
+//  (внутри функции initDetailCanvas)
+// ============================================
+
     function handleStart(e) {
         e.preventDefault();
         const hour = getHourFromEvent(e);
@@ -2713,26 +3054,41 @@ function initDetailCanvas() {
         const user = getCurrentUser();
         const currentUserId = user ? user.id : null;
         
+        // Проверяем, есть ли запись на этом часе
         const existingRecord = getRecordAtHour(dateKey, hour);
+        
         if (existingRecord) {
             const isOwn = currentUserId && existingRecord.masterId === currentUserId;
             const isAdmin = isAdminMode();
             const canEdit = isOwn || isAdmin;
             
+            // ✅ ПЕРЕДАЕМ ПРАВИЛЬНЫЙ ID (id или _localId)
+            const recordId = existingRecord.id || existingRecord._localId;
+            
+            console.log('🖱️ Клик по циферблату, запись найдена:', {
+                recordId: recordId,
+                serviceType: existingRecord.serviceTypeName || existingRecord.serviceType,
+                master: existingRecord.master,
+                isOwn: isOwn,
+                canEdit: canEdit
+            });
+            
             if (canEdit) {
-                openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id, false);
+                openModal(Detail.currentDay, currentMonth, currentYear, null, recordId, false);
             } else {
-                openModal(Detail.currentDay, currentMonth, currentYear, null, existingRecord.id, true);
+                openModal(Detail.currentDay, currentMonth, currentYear, null, recordId, true);
             }
             return;
         }
         
+        // Если нет записи — проверяем, не занят ли этот час
         const bookedHours = getBookedHours(dateKey);
         if (bookedHours.has(hour)) {
             showToast(TEXTS.messages.timeBusy, 'error');
             return;
         }
         
+        // Начинаем выделение диапазона
         isRangeDragging = true;
         rangeStart = hour;
         rangeHours = [hour];
@@ -2840,26 +3196,6 @@ function initDetailCanvas() {
     detailCanvas.addEventListener('touchstart', handleStart, { passive: false });
     detailCanvas.addEventListener('touchmove', handleMove, { passive: false });
     detailCanvas.addEventListener('touchend', handleEnd, { passive: false });
-}
-
-// ============================================
-//  TOAST
-// ============================================
-
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.style.cssText = `
-        position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-        padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 500;
-        background: ${type === 'error' ? '#C62828' : '#008080'};
-        color: #FFF; z-index: 9999; max-width: 90%; text-align: center;
-        animation: slideUp 0.3s ease; opacity: 0; transition: opacity 0.3s ease;
-        font-family: 'Montserrat', sans-serif;
-    `;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.style.opacity = '1', 50);
-    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
 // ============================================

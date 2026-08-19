@@ -1,16 +1,32 @@
-const CACHE_NAME = 'calendar-pwa-v38';
+const CACHE_NAME = 'calendar-pwa-v39';
 const urlsToCache = [
     '/',
     '/index.html',
+    '/settings.html',
+    '/login.html',
     '/styles.css',
+    '/settings.css',
+    '/manifest.json',
+    '/favicon.ico',
     '/js/app.js',
+    '/js/common.js',
+    '/js/settings.js',
+    '/js/auth.js',
     '/js/db.js',
     '/js/notifications.js',
     '/js/firebase-config.js',
     '/js/firebase-sync.js',
-    '/js/auth.js',
+    '/js/template-storage.js',
     'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
-    'https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js'
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js',
+    '/icons/icon-72.png',
+    '/icons/icon-96.png',
+    '/icons/icon-128.png',
+    '/icons/icon-144.png',
+    '/icons/icon-152.png',
+    '/icons/icon-192.png',
+    '/icons/icon-384.png',
+    '/icons/icon-512.png'
 ];
 
 // === УСТАНОВКА ===

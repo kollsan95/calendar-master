@@ -15,21 +15,86 @@ const firebaseConfig = {
 };
 
 // ============================================
-//  ИНИЦИАЛИЗАЦИЯ FIREBASE
+//  ПРОВЕРКА ОФФЛАЙН-РЕЖИМА
 // ============================================
 
-if (typeof firebase !== 'undefined' && firebase.initializeApp) {
-    try {
-        firebase.initializeApp(firebaseConfig);
-        console.log('✅ Firebase инициализирован из config');
-    } catch (error) {
-        console.error('❌ Ошибка инициализации Firebase:', error);
+let isOffline = localStorage.getItem('offline_mode') === 'true';
+
+// ✅ Функция для принудительной инициализации Firebase
+function initFirebaseApp() {
+    // Проверяем, что Firebase доступен
+    if (typeof firebase === 'undefined' || !firebase.initializeApp) {
+        console.error('❌ Firebase SDK не загружен');
+        return false;
     }
-} else {
-    console.error('❌ Firebase SDK не загружен. Проверьте подключение скриптов.');
+    
+    // Проверяем, не инициализирован ли уже
+    try {
+        const app = firebase.app();
+        if (app) {
+            console.log('✅ Firebase уже инициализирован');
+            return true;
+        }
+    } catch (e) {
+        // Firebase не инициализирован - инициализируем
+        try {
+            firebase.initializeApp(firebaseConfig);
+            console.log('✅ Firebase инициализирован из config');
+            
+            // Включаем офлайн-кэширование
+            try {
+                if (typeof firebase.database().setPersistenceEnabled === 'function') {
+                    firebase.database().setPersistenceEnabled(true)
+                        .then(() => console.log('✅ Офлайн-кэширование включено'))
+                        .catch(err => console.warn('⚠️ Ошибка кэширования:', err.message));
+                }
+            } catch (e) {
+                console.warn('⚠️ Ошибка включения кэширования:', e.message);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Ошибка инициализации Firebase:', error);
+            return false;
+        }
+    }
 }
 
-// Экспортируем для использования
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = firebase;
+// ✅ Функция для переключения режима онлайн/оффлайн
+function setFirebaseOnlineMode(enabled) {
+    isOffline = !enabled;
+    localStorage.setItem('offline_mode', String(!enabled));
+    
+    if (enabled) {
+        // Включаем онлайн-режим - инициализируем Firebase
+        const result = initFirebaseApp();
+        if (result) {
+            console.log('☁️ Firebase активирован для онлайн-режима');
+        }
+        return result;
+    } else {
+        // Выключаем онлайн-режим - отключаем Firebase
+        console.log('📴 Переход в оффлайн-режим');
+        return true;
+    }
+}
+
+// ============================================
+//  ИНИЦИАЛИЗАЦИЯ (ТОЛЬКО ЕСЛИ НЕ ОФФЛАЙН)
+// ============================================
+
+// ✅ Инициализируем Firebase, если не оффлайн-режим
+if (!isOffline) {
+    initFirebaseApp();
+} else {
+    console.log('📴 Оффлайн-режим: Firebase не инициализирован');
+}
+
+// Экспортируем
+if (typeof window !== 'undefined') {
+    window.firebaseConfig = {
+        initFirebaseApp: initFirebaseApp,
+        setFirebaseOnlineMode: setFirebaseOnlineMode,
+        isOffline: isOffline
+    };
 }
